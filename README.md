@@ -4,7 +4,7 @@ A cozy, vintage-inspired macOS terminal dashboard combining htop-style system mo
 
 ## Status
 
-The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. CPU temperature, LOFI animations/clock, music integration, and live weather are pending in the terminal app. The browser prototype remains the visual reference.
+The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a live analog clock are also implemented. CPU temperature, music integration, and live weather are pending in the terminal app. The browser prototype remains the visual reference.
 
 ## Run the terminal app
 
@@ -23,7 +23,7 @@ htopmodern
 
 Cargo installs the executable in `~/.cargo/bin`; that directory must be on your `PATH`.
 
-Use `Ctrl+B` then `L`, `M`, `T`, or `W` to choose a panel, or use Tab. In TODO, press `A` or select **Add item** and press Enter. Up/Down selects a task, Left/Right selects its checkbox or Delete, and Enter activates it. Enter saves a new task; Escape cancels. `Q` or Ctrl+C exits. In tmux, use Tab for now because tmux intercepts Ctrl+B; configurable prefixes are planned.
+Use `Ctrl+B` then `L`, `M`, `T`, or `W` to choose a panel, or use Tab. In LOFI, Left/Right selects Previous/Next and Enter changes scene. The clock uses device local time; compact panels show digital time when the analog face cannot fit. In TODO, press `A` or select **Add item** and press Enter. Up/Down selects a task, Left/Right selects its checkbox or Delete, and Enter activates it. Enter saves a new task; Escape cancels. `Q` or Ctrl+C exits. In tmux, use Tab for now because tmux intercepts Ctrl+B; configurable prefixes are planned.
 
 Todos are saved to `~/Library/Application Support/htopmodern/todos.json`. Set `HTOPMODERN_DATA_DIR` to override the storage directory. Invalid storage files are reported rather than overwritten. Narrow terminals show the selected bottom panel; widths of at least 110 columns show all four.
 

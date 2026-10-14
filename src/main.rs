@@ -1,3 +1,4 @@
+mod lofi;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -61,6 +62,9 @@ struct App {
     input: Option<String>,
     prefix: bool,
     message: String,
+    scene: usize,
+    lofi_action: usize,
+    started: Instant,
 }
 impl App {
     fn new(path: PathBuf) -> io::Result<Self> {
@@ -75,6 +79,9 @@ impl App {
             input: None,
             prefix: false,
             message: String::new(),
+            scene: 0,
+            lofi_action: 0,
+            started: Instant::now(),
         };
         app.refresh();
         Ok(app)
@@ -145,6 +152,12 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => return true,
+            KeyCode::Left | KeyCode::Right if self.panel == 0 => {
+                self.lofi_action = 1 - self.lofi_action
+            }
+            KeyCode::Enter if self.panel == 0 => {
+                self.scene = (self.scene + if self.lofi_action == 0 { 2 } else { 1 }) % 3
+            }
             KeyCode::Tab => self.panel = (self.panel + 1) % 4,
             KeyCode::BackTab => self.panel = (self.panel + 3) % 4,
             KeyCode::Char('a') if self.panel == 2 => self.input = Some(String::new()),
@@ -328,7 +341,9 @@ fn ui(f: &mut Frame, app: &App) {
     if area.width >= 110 {
         let panels = Layout::horizontal([Constraint::Percentage(25); 4]).split(parts[2]);
         for i in 0..4 {
-            if i == 2 {
+            if i == 0 {
+                lofi::draw(f, panels[i], app);
+            } else if i == 2 {
                 todos(f, panels[i], app);
             } else {
                 f.render_widget(
@@ -339,6 +354,8 @@ fn ui(f: &mut Frame, app: &App) {
                 );
             }
         }
+    } else if app.panel == 0 {
+        lofi::draw(f, parts[2], app);
     } else if app.panel == 2 {
         todos(f, parts[2], app);
     } else {
@@ -464,6 +481,31 @@ mod tests {
         assert!(app.input.is_none());
         assert!(app.tasks.is_empty());
         fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn lofi_controls_and_rendering() {
+        let mut app = App::new(env::temp_dir().join("htopmodern-lofi-no-file.json")).unwrap();
+        app.panel = 0;
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(app.scene, 2);
+        app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(app.scene, 0);
+        let mut outputs = Vec::new();
+        for scene in 0..3 {
+            app.scene = scene;
+            let mut term =
+                ratatui::Terminal::new(ratatui::backend::TestBackend::new(40, 20)).unwrap();
+            term.draw(|f| lofi::draw(f, f.area(), &app)).unwrap();
+            outputs.push(term.backend().buffer().clone());
+            for (w, h) in [(1, 1), (15, 4), (25, 9)] {
+                let mut tiny =
+                    ratatui::Terminal::new(ratatui::backend::TestBackend::new(w, h)).unwrap();
+                tiny.draw(|f| lofi::draw(f, f.area(), &app)).unwrap();
+            }
+        }
+        assert_ne!(outputs[0], outputs[1]);
+        assert_ne!(outputs[1], outputs[2]);
     }
     #[test]
     fn small_terminal_renders() {
