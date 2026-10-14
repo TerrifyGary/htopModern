@@ -8,6 +8,10 @@ This repository currently contains the agreed interactive browser design prototy
 
 ## Preview
 
+![Current dashboard design preview](docs/images/dashboard-preview.png)
+
+*Browser design prototype; system metrics and music information are illustrative.*
+
 Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock run locally. Weather uses Open-Meteo and requires internet access; Taipei is the default location. Weather loading errors are shown without hiding the character.
 
 ## Agreed design
