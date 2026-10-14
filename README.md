@@ -15,7 +15,7 @@ Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock
 - **COMPUTER:** individual CPU meters, memory and swap, task/thread counts, load averages, uptime, CPU temperature where supported, and a simplified process table in the same box. No PID or kill controls.
 - **LOFI · L:** generated animated Fireplace, Beach, and Coffee Shop scenes; previous/next scene buttons; analog clock using device time. No GIF dependency.
 - **MUSIC · M:** animated music bars, track and artist, playback timing on its own line, and selectable previous/play-pause/next buttons.
-- **TODO · T:** selectable checkboxes and trash buttons, with persistent local storage planned.
+- **TODO · T:** an Add item button with task entry, selectable checkboxes and trash buttons, with persistent local storage planned.
 - **WEATHER · W:** editable location defaulting to Taipei; a cute schoolgirl character reacts to Sunny, Windy, Cloudy, Rainy, and Snowy conditions, with day/night backgrounds chosen automatically. No manual weather or night buttons.
 - Terminal app fills the terminal window and responds to resizing, adapting CPU meters and panel layout to available rows and columns.
 - Configurable prefix shortcuts, initially `Ctrl+B` followed by `L`, `M`, `T`, or `W`; arrows select controls and Enter activates them. The prefix must be configurable to avoid conflicts with tmux.
