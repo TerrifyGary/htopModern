@@ -4,7 +4,33 @@ A cozy, vintage-inspired macOS terminal dashboard combining htop-style system mo
 
 ## Status
 
-This repository currently contains the agreed interactive browser design prototype. The terminal application has not been implemented yet. System metrics and music information in the prototype are illustrative; music controls do not control a real player, and todos are not persisted.
+The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. CPU temperature, LOFI animations/clock, music integration, and live weather are pending in the terminal app. The browser prototype remains the visual reference.
+
+## Run the terminal app
+
+With a stable Rust toolchain installed:
+
+```sh
+cargo run --locked
+```
+
+To install the command:
+
+```sh
+cargo install --path . --locked
+htopmodern
+```
+
+Cargo installs the executable in `~/.cargo/bin`; that directory must be on your `PATH`.
+
+Use `Ctrl+B` then `L`, `M`, `T`, or `W` to choose a panel, or use Tab. In TODO, press `A` or select **Add item** and press Enter. Up/Down selects a task, Left/Right selects its checkbox or Delete, and Enter activates it. Enter saves a new task; Escape cancels. `Q` or Ctrl+C exits. In tmux, use Tab for now because tmux intercepts Ctrl+B; configurable prefixes are planned.
+
+Todos are saved to `~/Library/Application Support/htopmodern/todos.json`. Set `HTOPMODERN_DATA_DIR` to override the storage directory. Invalid storage files are reported rather than overwritten. Narrow terminals show the selected bottom panel; widths of at least 110 columns show all four.
+
+```sh
+cargo run --locked -- --check  # read-only system snapshot
+cargo test --locked
+```
 
 ## Preview
 
