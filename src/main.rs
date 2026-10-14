@@ -1,3 +1,4 @@
+mod graphics;
 mod lofi;
 mod weather;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -68,6 +69,7 @@ struct App {
     started: Instant,
     cell_aspect: f64,
     aspect_override: Option<f64>,
+    graphics: std::cell::RefCell<graphics::Graphics>,
     weather: weather::Weather,
 }
 impl App {
@@ -89,6 +91,7 @@ impl App {
             started: Instant::now(),
             cell_aspect: cell_aspect(),
             aspect_override: None,
+            graphics: std::cell::RefCell::new(graphics::Graphics::new()),
         };
         app.refresh();
         Ok(app)
@@ -498,6 +501,7 @@ fn main() -> io::Result<()> {
     }
     app.weather.request();
     let mut terminal = ratatui::init();
+    app.message = app.graphics.borrow_mut().detect();
     let result = (|| {
         let mut refreshed = Instant::now();
         loop {

@@ -421,11 +421,18 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     );
     let h = art.height;
     let t = app.started.elapsed().as_secs_f64();
-    if h > 0 {
-        let mut raster = Raster::new(
-            usize::from(art.width) * SAMPLES,
-            usize::from(art.height) * SAMPLES * 2,
-        );
+    let mut graphics = app.graphics.borrow_mut();
+    let native = graphics.native();
+    let ready = graphics.ready(art);
+    if h > 0 && (!native || ready) {
+        let mut raster = if native {
+            Raster::new(1024, 1024)
+        } else {
+            Raster::new(
+                usize::from(art.width) * SAMPLES,
+                usize::from(art.height) * SAMPLES * 2,
+            )
+        };
         let ctx = &mut raster;
         let storm = mode == "Rainy";
         let sky = if !day {
@@ -547,18 +554,38 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             }
         }
         schoolgirl(ctx, mode, t);
-        for row in 0..art.height {
-            for col in 0..art.width {
-                let top = raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2);
-                let bottom =
-                    raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2 + SAMPLES);
-                f.buffer_mut()[(art.x + col, art.y + row)]
-                    .set_symbol("▀")
-                    .set_fg(top)
-                    .set_bg(bottom);
+        if native {
+            let bytes: Vec<u8> = raster
+                .pixels
+                .iter()
+                .flat_map(|c| match c {
+                    Color::Rgb(r, g, b) => [*r, *g, *b],
+                    _ => [0, 0, 0],
+                })
+                .collect();
+            if let Some(image) =
+                image::RgbImage::from_raw(raster.width as u32, raster.height as u32, bytes)
+            {
+                graphics.submit(image, art);
+            }
+        } else {
+            for row in 0..art.height {
+                for col in 0..art.width {
+                    let top = raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2);
+                    let bottom = raster
+                        .average(col as usize * SAMPLES, row as usize * SAMPLES * 2 + SAMPLES);
+                    f.buffer_mut()[(art.x + col, art.y + row)]
+                        .set_symbol("▀")
+                        .set_fg(top)
+                        .set_bg(bottom);
+                }
             }
         }
     }
+    if native {
+        graphics.render(f, art);
+    }
+
     let bottom = inner.y + inner.height.saturating_sub(3);
     let age = snapshot
         .map(|s| {
