@@ -1,4 +1,5 @@
 mod lofi;
+mod weather;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -65,11 +66,13 @@ struct App {
     scene: usize,
     lofi_action: usize,
     started: Instant,
+    weather: weather::Weather,
 }
 impl App {
     fn new(path: PathBuf) -> io::Result<Self> {
         let tasks = load_tasks(&path)?;
         let mut app = Self {
+            weather: weather::Weather::new(path.with_file_name("weather.json")),
             sys: System::new(),
             tasks,
             path,
@@ -103,6 +106,29 @@ impl App {
     fn key(&mut self, key: KeyEvent) -> bool {
         if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
             return true;
+        }
+        if let Some(input) = self.weather.input.as_mut() {
+            match key.code {
+                KeyCode::Esc => self.weather.input = None,
+                KeyCode::Backspace => {
+                    input.pop();
+                }
+                KeyCode::Char(c)
+                    if !key.modifiers.contains(KeyModifiers::CONTROL)
+                        && input.chars().count() < 80 =>
+                {
+                    input.push(c)
+                }
+                KeyCode::Enter => {
+                    let query = input.trim().to_string();
+                    if !query.is_empty() {
+                        self.weather.input = None;
+                        self.weather.set_query(query);
+                    }
+                }
+                _ => {}
+            }
+            return false;
         }
         if let Some(input) = self.input.as_mut() {
             match key.code {
@@ -152,6 +178,10 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => return true,
+            KeyCode::Enter | KeyCode::Char('e') if self.panel == 3 => {
+                self.weather.input = Some(self.weather.query.clone())
+            }
+            KeyCode::Char('r') if self.panel == 3 => self.weather.request(),
             KeyCode::Left | KeyCode::Right if self.panel == 0 => {
                 self.lofi_action = 1 - self.lofi_action
             }
@@ -343,6 +373,8 @@ fn ui(f: &mut Frame, app: &App) {
         for i in 0..4 {
             if i == 0 {
                 lofi::draw(f, panels[i], app);
+            } else if i == 3 {
+                weather::draw(f, panels[i], app);
             } else if i == 2 {
                 todos(f, panels[i], app);
             } else {
@@ -356,6 +388,8 @@ fn ui(f: &mut Frame, app: &App) {
         }
     } else if app.panel == 0 {
         lofi::draw(f, parts[2], app);
+    } else if app.panel == 3 {
+        weather::draw(f, parts[2], app);
     } else if app.panel == 2 {
         todos(f, parts[2], app);
     } else {
@@ -391,6 +425,19 @@ fn uptime_label() -> String {
 }
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
+    if args.get(1).is_some_and(|a| a == "--weather-check") {
+        let query = args.get(2).map(String::as_str).unwrap_or("Taipei");
+        let snapshot = weather::fetch(query).map_err(io::Error::other)?;
+        println!(
+            "{} · {} · {:.1}°C · {}",
+            snapshot.location,
+            snapshot.condition(),
+            snapshot.temperature,
+            if snapshot.day { "Day" } else { "Night" }
+        );
+        return Ok(());
+    }
+
     if args.iter().any(|a| a == "--help" || a == "-h") {
         println!("htopmodern — cozy terminal dashboard\n\nCtrl+B then L/M/T/W: panel · Tab: next panel · Q: quit\nTODO: A adds, ↑↓ selects, ←→ selects checkbox/delete, Enter activates\nEntry: Enter saves, Escape cancels\nHTOPMODERN_DATA_DIR overrides todo storage.\n--check prints a system snapshot without entering full screen.");
         return Ok(());
@@ -417,10 +464,12 @@ fn main() -> io::Result<()> {
         ));
     }
     let mut app = App::new(data_path()?)?;
+    app.weather.request();
     let mut terminal = ratatui::init();
     let result = (|| {
         let mut refreshed = Instant::now();
         loop {
+            app.weather.tick();
             terminal.draw(|f| ui(f, &app))?;
             if event::poll(Duration::from_millis(100))? {
                 if let Event::Key(key) = event::read()? {
