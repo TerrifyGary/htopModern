@@ -68,4 +68,4 @@ The prototype uses [Open-Meteo](https://open-meteo.com/) geocoding and current w
 
 Target Mac hardware, preferred terminal, music player, implementation language, and final project name remain to be confirmed.
 
-Weather scenes use a centered square viewport based on terminal pixel/cell dimensions when reported. If the terminal does not report pixels, a 2:1 cell ratio is assumed; set `HTOPMODERN_CELL_ASPECT=2.4` (cell height divided by cell width) to calibrate your font. Weather artwork uses supersampled color blending; its final detail is still limited by character cells.
+Weather scenes use a centered square viewport based on terminal pixel/cell dimensions when reported. If the terminal does not report pixels, a 2.3:1 cell ratio is assumed; use `cargo run --locked -- --cell-aspect 2.3` or set `HTOPMODERN_CELL_ASPECT=2.3` (cell height divided by cell width) to calibrate your font. Weather artwork uses supersampled color blending; its final detail is still limited by character cells.

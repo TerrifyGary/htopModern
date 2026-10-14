@@ -67,6 +67,7 @@ struct App {
     lofi_action: usize,
     started: Instant,
     cell_aspect: f64,
+    aspect_override: Option<f64>,
     weather: weather::Weather,
 }
 impl App {
@@ -87,6 +88,7 @@ impl App {
             lofi_action: 0,
             started: Instant::now(),
             cell_aspect: cell_aspect(),
+            aspect_override: None,
         };
         app.refresh();
         Ok(app)
@@ -442,7 +444,7 @@ fn cell_aspect() -> f64 {
             }
         }
     }
-    2.0
+    2.3
 }
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
@@ -460,7 +462,7 @@ fn main() -> io::Result<()> {
     }
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("htopmodern — cozy terminal dashboard\n\nCtrl+B then L/M/T/W: panel · Tab: next panel · Q: quit\nTODO: A adds, ↑↓ selects, ←→ selects checkbox/delete, Enter activates\nEntry: Enter saves, Escape cancels\nHTOPMODERN_DATA_DIR overrides todo storage.\n--check prints a system snapshot without entering full screen.");
+        println!("htopmodern — cozy terminal dashboard\n\nCtrl+B then L/M/T/W: panel · Tab: next panel · Q: quit\nTODO: A adds, ↑↓ selects, ←→ selects checkbox/delete, Enter activates\nEntry: Enter saves, Escape cancels\nHTOPMODERN_DATA_DIR overrides todo storage.\n--cell-aspect 2.3 calibrates square weather scenes for your font.\n--check prints a system snapshot without entering full screen.");
         return Ok(());
     }
     if args.iter().any(|a| a == "--check") {
@@ -485,6 +487,15 @@ fn main() -> io::Result<()> {
         ));
     }
     let mut app = App::new(data_path()?)?;
+    if let Some(index) = args.iter().position(|arg| arg == "--cell-aspect") {
+        let ratio = args
+            .get(index + 1)
+            .and_then(|v| v.parse::<f64>().ok())
+            .filter(|v| (1.0..=4.0).contains(v))
+            .ok_or_else(|| io::Error::other("--cell-aspect requires a number between 1 and 4"))?;
+        app.cell_aspect = ratio;
+        app.aspect_override = Some(ratio);
+    }
     app.weather.request();
     let mut terminal = ratatui::init();
     let result = (|| {
@@ -495,7 +506,7 @@ fn main() -> io::Result<()> {
             if event::poll(Duration::from_millis(100))? {
                 let event = event::read()?;
                 if matches!(event, Event::Resize(_, _)) {
-                    app.cell_aspect = cell_aspect();
+                    app.cell_aspect = app.aspect_override.unwrap_or_else(cell_aspect);
                 }
                 if let Event::Key(key) = event {
                     if key.kind == KeyEventKind::Press && app.key(key) {
