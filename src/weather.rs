@@ -296,9 +296,9 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             }
             if mode != "Sunny" {
                 let x = if mode == "Windy" {
-                    70. + (t * 1.3).sin() * 8.
+                    65. + (t * 0.6).sin() * 16.
                 } else {
-                    72.
+                    65. + (t * 0.2).sin() * 8.
                 };
                 for dx in [-7., 0., 7.] {
                     ctx.draw(&Circle {
@@ -327,72 +327,54 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                     }
                 }
             }
-            let sway = if mode == "Windy" {
-                (t * 3.).sin() * 2.
-            } else {
-                (t * 2.).sin()
-            };
-            let x = 50. + sway;
-            let skin = Color::Rgb(239, 208, 182);
-            let hair = Color::Rgb(73, 59, 53);
-            let white = Color::Rgb(238, 230, 208);
-            let navy = Color::Rgb(52, 73, 97);
-            let pink = Color::Rgb(172, 101, 112);
-            fill(ctx, x - 10., 47., 20., 25., hair);
-            fill(ctx, x - 7., 50., 14., 15., skin);
-            fill(ctx, x - 10., 66., 20., 6., hair);
-            fill(ctx, x - 4., 58., 1.5, 1.5, hair);
-            fill(ctx, x + 3., 58., 1.5, 1.5, hair);
-            fill(ctx, x - 1., 53., 3., 1., hair);
-            fill(ctx, x - 9., 30., 18., 18., white);
-            fill(ctx, x - 9., 44., 18., 4., navy);
-            fill(ctx, x - 2., 38., 4., 6., pink);
-            fill(ctx, x - 14., 29., 5., 16., white);
-            fill(ctx, x - 14., 26., 5., 4., skin);
-            if mode == "Sunny" || mode == "Windy" {
-                let y = 52. + (t * 4.).sin() * 2.;
-                ctx.draw(&Stroke {
-                    x1: x + 9.,
-                    y1: 43.,
-                    x2: x + 16.,
-                    y2: y,
-                    color: white,
-                });
-                fill(ctx, x + 14., y, 3., 4., skin);
-            } else {
-                fill(ctx, x + 9., 29., 5., 16., white);
-                fill(ctx, x + 9., 26., 5., 4., skin);
+            if mode == "Windy" {
+                for i in 0..7 {
+                    let x = (t * 22. + i as f64 * 19.) % 110. - 10.;
+                    let y = 25. + (i % 4) as f64 * 12.;
+                    ctx.draw(&Stroke {
+                        x1: x.max(0.),
+                        y1: y,
+                        x2: (x + 14.).min(100.),
+                        y2: y,
+                        color: Color::Rgb(211, 225, 216),
+                    });
+                    fill(
+                        ctx,
+                        (x + 8.).clamp(0., 98.),
+                        y + (t + i as f64).sin() * 2.,
+                        2.,
+                        1.,
+                        Color::Rgb(183, 163, 105),
+                    );
+                }
             }
-            for row in 0..10 {
-                fill(
-                    ctx,
-                    x - 9. - row as f64 * 0.3,
-                    20. + (9 - row) as f64,
-                    18. + row as f64 * 0.6,
-                    1.,
-                    navy,
-                );
-            }
-            fill(ctx, x - 7., 12., 5., 8., skin);
-            fill(ctx, x + 2., 12., 5., 8., skin);
-            fill(ctx, x - 8., 10., 6., 4., hair);
-            fill(ctx, x + 2., 10., 6., 4., hair);
-            if mode == "Snowy" {
-                fill(ctx, x - 11., 44., 22., 4., pink);
-                fill(ctx, x + 7., 35., 4., 12., pink);
+            if mode == "Sunny" && day {
+                let pulse = (t * 1.5).sin() * 1.5;
+                for n in 0..8 {
+                    let angle = n as f64 * std::f64::consts::TAU / 8.;
+                    ctx.draw(&Stroke {
+                        x1: 20. + angle.sin() * 10.,
+                        y1: 82. + angle.cos() * 10.,
+                        x2: 20. + angle.sin() * (14. + pulse),
+                        y2: 82. + angle.cos() * (14. + pulse),
+                        color: Color::Rgb(243, 209, 130),
+                    });
+                }
             }
             if mode == "Rainy" {
-                for row in 0..10 {
-                    let w = (100. - (row as f64).powi(2)).sqrt() * 2.;
-                    fill(ctx, x + 13. - w / 2., 78. + row as f64, w, 1., pink);
+                for i in 0..4 {
+                    let radius = 2. + ((t * 5. + i as f64) % 5.);
+                    ctx.draw(&Stroke {
+                        x1: 15. + i as f64 * 22. - radius,
+                        y1: 10.,
+                        x2: 15. + i as f64 * 22. + radius,
+                        y2: 10.,
+                        color: Color::Rgb(148, 181, 195),
+                    });
                 }
-                ctx.draw(&Stroke {
-                    x1: x + 13.,
-                    y1: 78.,
-                    x2: x + 13.,
-                    y2: 40.,
-                    color: hair,
-                });
+            }
+            if mode == "Snowy" {
+                fill(ctx, 0., 0., 100., 10., Color::Rgb(219, 228, 223));
             }
         });
     if h > 0 {
@@ -421,18 +403,18 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 mod tests {
     use super::*;
     #[test]
-    fn character_renders_in_each_condition_and_small_panels() {
+    fn weather_scenes_render_in_each_condition_and_small_panels() {
         let mut app =
             App::new(std::env::temp_dir().join("htopmodern-weather-render/todos.json")).unwrap();
         app.panel = 3;
-        for code in [0, 3, 61, 75] {
+        for (code, wind) in [(0, 0.), (0, 30.), (3, 0.), (61, 0.), (75, 0.)] {
             for day in [true, false] {
                 app.weather.snapshot = Some(Snapshot {
                     query: "Taipei".into(),
                     location: "Taipei".into(),
                     temperature: 25.9,
                     code,
-                    wind: 30.,
+                    wind,
                     day,
                     fetched: Utc::now().timestamp(),
                 });
