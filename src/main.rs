@@ -66,6 +66,7 @@ struct App {
     scene: usize,
     lofi_action: usize,
     started: Instant,
+    cell_aspect: f64,
     weather: weather::Weather,
 }
 impl App {
@@ -85,6 +86,7 @@ impl App {
             scene: 0,
             lofi_action: 0,
             started: Instant::now(),
+            cell_aspect: cell_aspect(),
         };
         app.refresh();
         Ok(app)
@@ -423,6 +425,25 @@ fn uptime_label() -> String {
         seconds % 60
     )
 }
+fn cell_aspect() -> f64 {
+    if let Ok(value) = env::var("HTOPMODERN_CELL_ASPECT") {
+        if let Ok(ratio) = value.parse::<f64>() {
+            if (1.0..=4.0).contains(&ratio) {
+                return ratio;
+            }
+        }
+    }
+    if let Ok(size) = crossterm::terminal::window_size() {
+        if size.width > 0 && size.height > 0 && size.columns > 0 && size.rows > 0 {
+            let ratio =
+                (size.height as f64 / size.rows as f64) / (size.width as f64 / size.columns as f64);
+            if (1.0..=4.0).contains(&ratio) {
+                return ratio;
+            }
+        }
+    }
+    2.0
+}
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
     if args.get(1).is_some_and(|a| a == "--weather-check") {
@@ -472,7 +493,11 @@ fn main() -> io::Result<()> {
             app.weather.tick();
             terminal.draw(|f| ui(f, &app))?;
             if event::poll(Duration::from_millis(100))? {
-                if let Event::Key(key) = event::read()? {
+                let event = event::read()?;
+                if matches!(event, Event::Resize(_, _)) {
+                    app.cell_aspect = cell_aspect();
+                }
+                if let Event::Key(key) = event {
                     if key.kind == KeyEventKind::Press && app.key(key) {
                         break;
                     }

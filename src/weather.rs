@@ -202,6 +202,7 @@ impl Weather {
         }
     }
 }
+const SAMPLES: usize = 4;
 struct Raster {
     width: usize,
     height: usize,
@@ -238,16 +239,20 @@ impl Raster {
     }
     fn average(&self, x: usize, y: usize) -> Color {
         let (mut r, mut g, mut b) = (0u32, 0u32, 0u32);
-        for dy in 0..3 {
-            for dx in 0..3 {
+        for dy in 0..SAMPLES {
+            for dx in 0..SAMPLES {
                 if let Color::Rgb(cr, cg, cb) = self.pixels[(y + dy) * self.width + x + dx] {
-                    r += cr as u32;
-                    g += cg as u32;
-                    b += cb as u32;
+                    r += (cr as u32).pow(2);
+                    g += (cg as u32).pow(2);
+                    b += (cb as u32).pow(2);
                 }
             }
         }
-        Color::Rgb((r / 9) as u8, (g / 9) as u8, (b / 9) as u8)
+        Color::Rgb(
+            (r as f64 / (SAMPLES * SAMPLES) as f64).sqrt() as u8,
+            (g as f64 / (SAMPLES * SAMPLES) as f64).sqrt() as u8,
+            (b as f64 / (SAMPLES * SAMPLES) as f64).sqrt() as u8,
+        )
     }
 }
 fn fill(ctx: &mut Raster, x: f64, y: f64, w: f64, h: f64, color: Color) {
@@ -286,6 +291,16 @@ fn cloud(ctx: &mut Raster, x: f64, y: f64, scale: f64, color: Color) {
     for (dx, dy, r) in [(-11., 0., 6.), (-3., 4., 9.), (7., 3., 7.), (13., 0., 5.)] {
         disk(ctx, x + dx * scale, y + dy * scale, r * scale, color);
     }
+}
+fn square_viewport(area: Rect, aspect: f64) -> Rect {
+    let height = area.height.min((area.width as f64 / aspect).floor() as u16);
+    let width = (height as f64 * aspect).round().min(area.width as f64) as u16;
+    Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
+    )
 }
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let weather = &app.weather;
@@ -329,11 +344,17 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         Rect::new(inner.x, inner.y + 1, inner.width, 2.min(inner.height - 1)),
     );
     let available = inner.height.saturating_sub(6);
-    let h = available.min(inner.width / 2);
-    let art = Rect::new(inner.x + (inner.width - h * 2) / 2, inner.y + 3, h * 2, h);
+    let art = square_viewport(
+        Rect::new(inner.x, inner.y + 3, inner.width, available),
+        app.cell_aspect,
+    );
+    let h = art.height;
     let t = app.started.elapsed().as_secs_f64();
     if h > 0 {
-        let mut raster = Raster::new(usize::from(art.width) * 3, usize::from(art.height) * 6);
+        let mut raster = Raster::new(
+            usize::from(art.width) * SAMPLES,
+            usize::from(art.height) * SAMPLES * 2,
+        );
         let ctx = &mut raster;
         let storm = mode == "Rainy";
         let sky = if !day {
@@ -456,8 +477,9 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         }
         for row in 0..art.height {
             for col in 0..art.width {
-                let top = raster.average(col as usize * 3, row as usize * 6);
-                let bottom = raster.average(col as usize * 3, row as usize * 6 + 3);
+                let top = raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2);
+                let bottom =
+                    raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2 + SAMPLES);
                 f.buffer_mut()[(art.x + col, art.y + row)]
                     .set_symbol("▀")
                     .set_fg(top)
@@ -487,6 +509,16 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn square_viewport_uses_cell_dimensions() {
+        for aspect in [1.5, 2.0, 2.4] {
+            let area = Rect::new(5, 6, 40, 30);
+            let rect = square_viewport(area, aspect);
+            assert!((rect.width as f64 - rect.height as f64 * aspect).abs() <= 0.5);
+            assert!(rect.right() <= area.right());
+            assert!(rect.bottom() <= area.bottom());
+        }
+    }
     #[test]
     fn weather_scenes_render_in_each_condition_and_small_panels() {
         let mut app =
