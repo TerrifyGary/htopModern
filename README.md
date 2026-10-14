@@ -46,7 +46,7 @@ Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock
 - **LOFI · L:** generated animated Fireplace, Beach, and Coffee Shop scenes; previous/next scene buttons; flip-style digital clock using device time. No GIF dependency.
 - **MUSIC · M:** animated music bars, track and artist, playback timing on its own line, and selectable previous/play-pause/next buttons.
 - **TODO · T:** an Add item button with task entry, selectable checkboxes and trash buttons, with persistent local storage planned.
-- **WEATHER · W:** editable location defaulting to Taipei; animated sunshine, drifting clouds, wind, rain, and snow, with day/night backgrounds chosen automatically. A compact cat mascot is included, with a swaying tail, happy eyes in sunshine, an umbrella in rain, and a scarf in snow. No manual weather or night buttons.
+- **WEATHER · W:** editable location defaulting to Taipei; animated sunshine, drifting clouds, wind, rain, and snow, with day/night backgrounds chosen automatically. The scene is a calm landscape with no character or animal. No manual weather or night buttons.
 - Terminal app fills the terminal window and responds to resizing, adapting CPU meters and panel layout to available rows and columns.
 - Configurable prefix shortcuts, initially `Ctrl+B` followed by `L`, `M`, `T`, or `W`; arrows select controls and Enter activates them. The prefix must be configurable to avoid conflicts with tmux.
 
