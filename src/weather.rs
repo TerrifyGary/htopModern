@@ -302,69 +302,119 @@ fn square_viewport(area: Rect, aspect: f64) -> Rect {
         height,
     )
 }
-fn schoolgirl(ctx: &mut Raster, mode: &str, t: f64) {
-    let x = 48.
-        + if mode == "Windy" {
-            (t * 2.).sin() * 1.5
-        } else {
-            (t * 1.5).sin() * 0.5
-        };
-    let hair = Color::Rgb(64, 49, 47);
-    let skin = Color::Rgb(240, 210, 182);
-    let blouse = Color::Rgb(237, 229, 211);
-    let navy = Color::Rgb(49, 66, 89);
-    let ribbon = Color::Rgb(172, 100, 110);
-    // Simple chibi silhouette: bob haircut, sailor collar, pleated skirt, and shoes.
-    fill(ctx, x - 10., 44., 20., 23., hair);
-    fill(ctx, x - 7., 48., 14., 13., skin);
-    fill(ctx, x - 10., 61., 20., 5., hair);
-    fill(ctx, x - 8., 57., 3., 6., hair);
-    fill(ctx, x - 4., 54., 1.7, 1.7, hair);
-    fill(ctx, x + 3., 54., 1.7, 1.7, hair);
-    fill(ctx, x - 1., 50., 3., 1., ribbon);
-    fill(ctx, x - 8., 30., 16., 16., blouse);
-    fill(ctx, x - 8., 42., 16., 4., navy);
-    fill(ctx, x - 2., 36., 4., 7., ribbon);
-    fill(ctx, x - 12., 28., 4., 15., blouse);
-    fill(ctx, x - 12., 25., 4., 4., skin);
-    if mode == "Sunny" || mode == "Windy" {
-        let y = 49. + (t * 3.).sin() * 2.;
-        ctx.draw(&Stroke {
-            x1: x + 8.,
-            y1: 41.,
-            x2: x + 13.,
-            y2: y,
-            color: blouse,
-        });
-        fill(ctx, x + 12., y, 3., 4., skin);
+fn weather_cat(ctx: &mut Raster, mode: &str, t: f64) {
+    let x = 48.;
+    let bounce = (t * 1.8).sin() * 0.7;
+    let fur = Color::Rgb(219, 168, 106);
+    let cream = Color::Rgb(245, 219, 177);
+    let dark = Color::Rgb(71, 54, 47);
+    let pink = Color::Rgb(188, 112, 116);
+    // Thick swaying tail and a large, simple silhouette survive the fallback renderer.
+    let tip = 29. + (t * 2.).sin() * 3.;
+    for i in 0..14 {
+        let p = i as f64 / 13.;
+        disk(ctx, x + 12. + p * 17., 18. + p * (tip - 18.), 3., fur);
+    }
+    disk(ctx, x, 25. + bounce, 13., fur);
+    disk(ctx, x, 23. + bounce, 8., cream);
+    disk(ctx, x, 44. + bounce, 15., fur);
+    for row in 0..14 {
+        let half = (14 - row) as f64 * 0.42;
+        fill(
+            ctx,
+            x - 10. - half,
+            51. + row as f64 + bounce,
+            half * 2.,
+            1.,
+            fur,
+        );
+        fill(
+            ctx,
+            x + 10. - half,
+            51. + row as f64 + bounce,
+            half * 2.,
+            1.,
+            fur,
+        );
+    }
+    for row in 0..8 {
+        let half = (8 - row) as f64 * 0.3;
+        fill(
+            ctx,
+            x - 10. - half,
+            54. + row as f64 + bounce,
+            half * 2.,
+            1.,
+            pink,
+        );
+        fill(
+            ctx,
+            x + 10. - half,
+            54. + row as f64 + bounce,
+            half * 2.,
+            1.,
+            pink,
+        );
+    }
+    if mode == "Sunny" {
+        for dx in [-6., 6.] {
+            ctx.draw(&Stroke {
+                x1: x + dx - 2.,
+                y1: 45. + bounce,
+                x2: x + dx,
+                y2: 47. + bounce,
+                color: dark,
+            });
+            ctx.draw(&Stroke {
+                x1: x + dx,
+                y1: 47. + bounce,
+                x2: x + dx + 2.,
+                y2: 45. + bounce,
+                color: dark,
+            });
+        }
     } else {
-        fill(ctx, x + 8., 28., 4., 15., blouse);
-        fill(ctx, x + 8., 25., 4., 4., skin);
+        disk(ctx, x - 6., 46. + bounce, 1.7, dark);
+        disk(ctx, x + 6., 46. + bounce, 1.7, dark);
     }
-    for y in 0..10 {
-        let width = 18. + (9 - y) as f64 * 0.6;
-        fill(ctx, x - width / 2., 20. + y as f64, width, 1., navy);
+    disk(ctx, x, 41. + bounce, 1.5, pink);
+    for side in [-1., 1.] {
+        ctx.draw(&Stroke {
+            x1: x,
+            y1: 39. + bounce,
+            x2: x + side * 3.,
+            y2: 37. + bounce,
+            color: dark,
+        });
+        for dy in [-2., 2.] {
+            ctx.draw(&Stroke {
+                x1: x + side * 9.,
+                y1: 40. + bounce + dy,
+                x2: x + side * 17.,
+                y2: 40. + bounce + dy + side,
+                color: cream,
+            });
+        }
     }
-    for dx in [-6., 2.] {
-        fill(ctx, x + dx, 12., 4., 8., skin);
-        fill(ctx, x + dx - 1., 9., 6., 4., hair);
-    }
+    disk(ctx, x - 7., 13., 4., cream);
+    disk(ctx, x + 7., 13., 4., cream);
     if mode == "Snowy" {
-        fill(ctx, x - 10., 41., 20., 4., ribbon);
-        fill(ctx, x + 6., 33., 4., 10., ribbon);
+        fill(ctx, x - 12., 31., 24., 4., pink);
+        fill(ctx, x + 7., 23., 4., 10., pink);
     }
     if mode == "Rainy" {
-        for y in 0..9 {
-            let half = (81. - (y as f64).powi(2)).sqrt() * 1.6;
-            fill(ctx, x + 13. - half, 70. + y as f64, half * 2., 1., ribbon);
-        }
+        let pole = x + 19.;
         ctx.draw(&Stroke {
-            x1: x + 13.,
-            y1: 70.,
-            x2: x + 13.,
-            y2: 36.,
-            color: hair,
+            x1: pole,
+            y1: 66.,
+            x2: pole,
+            y2: 17.,
+            color: dark,
         });
+        for row in 0..12 {
+            let half = (144. - (row as f64).powi(2)).sqrt() * 1.5;
+            fill(ctx, pole - half, 66. + row as f64, half * 2., 1., pink);
+        }
     }
 }
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
@@ -553,7 +603,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 }
             }
         }
-        schoolgirl(ctx, mode, t);
+        weather_cat(ctx, mode, t);
         if native {
             let bytes: Vec<u8> = raster
                 .pixels
