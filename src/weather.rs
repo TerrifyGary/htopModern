@@ -5,7 +5,7 @@ use ratatui::{
     style::{Color, Style},
     symbols::Marker,
     widgets::{
-        canvas::{Canvas, Circle, Context, Line as Stroke},
+        canvas::{Canvas, Context, Line as Stroke},
         Paragraph, Wrap,
     },
     Frame,
@@ -219,6 +219,27 @@ fn fill(ctx: &mut Context<'_>, x: f64, y: f64, w: f64, h: f64, color: Color) {
         n += 0.5;
     }
 }
+fn disk(ctx: &mut Context<'_>, x: f64, y: f64, r: f64, color: Color) {
+    let mut dy = -r;
+    while dy <= r {
+        let half = (r * r - dy * dy).max(0.).sqrt();
+        fill(ctx, x - half, y + dy, half * 2., 0., color);
+        dy += 0.5;
+    }
+}
+fn cloud(ctx: &mut Context<'_>, x: f64, y: f64, scale: f64, color: Color) {
+    fill(
+        ctx,
+        x - 15. * scale,
+        y - 4. * scale,
+        30. * scale,
+        7. * scale,
+        color,
+    );
+    for (dx, dy, r) in [(-11., 0., 6.), (-3., 4., 9.), (7., 3., 7.), (13., 0., 5.)] {
+        disk(ctx, x + dx * scale, y + dy * scale, r * scale, color);
+    }
+}
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let weather = &app.weather;
     let b = block(" WEATHER · W ", app.panel == 3);
@@ -269,112 +290,124 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         .x_bounds([0., 100.])
         .y_bounds([0., 100.])
         .paint(|ctx| {
-            fill(
-                ctx,
-                0.,
-                0.,
-                100.,
-                100.,
-                if day {
-                    Color::Rgb(181, 200, 189)
-                } else {
-                    Color::Rgb(40, 55, 76)
-                },
-            );
-            fill(ctx, 0., 0., 100., 12., Color::Rgb(112, 138, 105));
-            ctx.draw(&Circle {
-                x: 20.,
-                y: 82.,
-                radius: 7.,
-                color: Color::Rgb(243, 209, 130),
-            });
+            let storm = mode == "Rainy";
+            let sky = if !day {
+                Color::Rgb(36, 45, 66)
+            } else if storm {
+                Color::Rgb(114, 139, 151)
+            } else {
+                Color::Rgb(151, 180, 180)
+            };
+            fill(ctx, 0., 0., 100., 100., sky);
+            let orb = if day {
+                Color::Rgb(238, 206, 139)
+            } else {
+                Color::Rgb(222, 224, 204)
+            };
+            disk(ctx, 23., 76., 10., orb);
             if !day {
-                fill(ctx, 21., 79., 7., 10., Color::Rgb(40, 55, 76));
-                for (x, y) in [(45., 90.), (80., 75.), (65., 85.)] {
-                    fill(ctx, x, y, 1., 1., Color::Rgb(238, 240, 225));
+                disk(ctx, 27., 80., 9., sky);
+                for (i, (x, y)) in [(48., 89.), (79., 84.), (62., 71.), (88., 63.), (12., 91.)]
+                    .iter()
+                    .enumerate()
+                {
+                    let color = if (t + i as f64).sin() > 0. {
+                        Color::Rgb(205, 214, 218)
+                    } else {
+                        Color::Rgb(135, 152, 172)
+                    };
+                    fill(ctx, *x, *y, 1., 1., color);
                 }
             }
-            if mode != "Sunny" {
-                let x = if mode == "Windy" {
-                    65. + (t * 0.6).sin() * 16.
+            if mode != "Sunny" && mode != "Unknown" {
+                let speed = if mode == "Windy" { 0.8 } else { 0.18 };
+                for (x, y, scale) in [(58., 72., 1.), (29., 58., 0.65)] {
+                    let drift = (t * speed).sin() * 5.;
+                    let shade = if day {
+                        Color::Rgb(173, 191, 190)
+                    } else {
+                        Color::Rgb(66, 80, 101)
+                    };
+                    let color = if storm {
+                        Color::Rgb(193, 205, 207)
+                    } else if day {
+                        Color::Rgb(228, 230, 213)
+                    } else {
+                        Color::Rgb(144, 156, 172)
+                    };
+                    cloud(ctx, x + drift, y - 2., scale, shade);
+                    cloud(ctx, x + drift, y + 1., scale, color);
+                }
+            }
+            // Layered hills fill the lower third instead of leaving a flat empty field.
+            for x in 0..=100 {
+                let xf = x as f64;
+                let distant = 26. + (xf / 19.).sin() * 7.;
+                let near = 15. + (xf / 15. + 1.7).sin() * 5.;
+                let back = if mode == "Snowy" {
+                    Color::Rgb(180, 197, 200)
+                } else if day {
+                    Color::Rgb(102, 134, 123)
                 } else {
-                    65. + (t * 0.2).sin() * 8.
+                    Color::Rgb(49, 72, 76)
                 };
-                for dx in [-7., 0., 7.] {
-                    ctx.draw(&Circle {
-                        x: x + dx,
-                        y: 77.,
-                        radius: 6.,
-                        color: Color::Rgb(225, 231, 221),
-                    });
+                let front = if mode == "Snowy" {
+                    Color::Rgb(221, 228, 220)
+                } else if day {
+                    Color::Rgb(74, 107, 92)
+                } else {
+                    Color::Rgb(35, 55, 61)
+                };
+                fill(ctx, xf, 0., 1., distant, back);
+                fill(ctx, xf, 0., 1., near, front);
+            }
+            // A small pine gives the landscape a quiet point of reference.
+            let tree = if day {
+                Color::Rgb(52, 83, 72)
+            } else {
+                Color::Rgb(25, 43, 48)
+            };
+            fill(ctx, 78., 12., 2., 18., tree);
+            for (y, width) in [(24., 10.), (31., 8.), (38., 5.)] {
+                for n in 0..9 {
+                    let half = width * (1. - n as f64 / 9.);
+                    fill(ctx, 79. - half, y + n as f64, half * 2., 1., tree);
                 }
             }
             if mode == "Rainy" || mode == "Snowy" {
-                for i in 0..14 {
-                    let x = (i * 23 % 100) as f64;
-                    let y =
-                        95. - ((t * if mode == "Rainy" { 35. } else { 10. } + i as f64 * 9.) % 80.);
-                    if mode == "Rainy" {
+                for i in 0..28 {
+                    let speed = if storm { 28. } else { 7. };
+                    let y = 88. - ((t * speed + i as f64 * 11.) % 76.);
+                    let x = ((i * 37 % 100) as f64
+                        + if storm { 0. } else { (t + i as f64).sin() * 3. })
+                    .clamp(1., 98.);
+                    if storm {
                         ctx.draw(&Stroke {
                             x1: x,
                             y1: y,
-                            x2: x - 2.,
-                            y2: y - 5.,
-                            color: Color::Rgb(200, 216, 225),
+                            x2: (x - 2.).max(0.),
+                            y2: y - 4.,
+                            color: Color::Rgb(180, 203, 213),
                         });
                     } else {
-                        fill(ctx, x, y, 1.5, 1.5, Color::Rgb(235, 238, 235));
+                        fill(ctx, x, y, 1.3, 1.3, Color::Rgb(235, 238, 227));
                     }
                 }
             }
             if mode == "Windy" {
-                for i in 0..7 {
-                    let x = (t * 22. + i as f64 * 19.) % 110. - 10.;
-                    let y = 25. + (i % 4) as f64 * 12.;
-                    ctx.draw(&Stroke {
-                        x1: x.max(0.),
-                        y1: y,
-                        x2: (x + 14.).min(100.),
-                        y2: y,
-                        color: Color::Rgb(211, 225, 216),
-                    });
-                    fill(
-                        ctx,
-                        (x + 8.).clamp(0., 98.),
-                        y + (t + i as f64).sin() * 2.,
-                        2.,
-                        1.,
-                        Color::Rgb(183, 163, 105),
-                    );
+                for i in 0..5 {
+                    let x = (t * 16. + i as f64 * 24.) % 125. - 15.;
+                    let y = 36. + (i % 3) as f64 * 9.;
+                    if x + 12. > 0. && x < 100. {
+                        ctx.draw(&Stroke {
+                            x1: x.max(0.),
+                            y1: y,
+                            x2: (x + 12.).min(100.),
+                            y2: y,
+                            color: Color::Rgb(206, 221, 209),
+                        });
+                    }
                 }
-            }
-            if mode == "Sunny" && day {
-                let pulse = (t * 1.5).sin() * 1.5;
-                for n in 0..8 {
-                    let angle = n as f64 * std::f64::consts::TAU / 8.;
-                    ctx.draw(&Stroke {
-                        x1: 20. + angle.sin() * 10.,
-                        y1: 82. + angle.cos() * 10.,
-                        x2: 20. + angle.sin() * (14. + pulse),
-                        y2: 82. + angle.cos() * (14. + pulse),
-                        color: Color::Rgb(243, 209, 130),
-                    });
-                }
-            }
-            if mode == "Rainy" {
-                for i in 0..4 {
-                    let radius = 2. + ((t * 5. + i as f64) % 5.);
-                    ctx.draw(&Stroke {
-                        x1: 15. + i as f64 * 22. - radius,
-                        y1: 10.,
-                        x2: 15. + i as f64 * 22. + radius,
-                        y2: 10.,
-                        color: Color::Rgb(148, 181, 195),
-                    });
-                }
-            }
-            if mode == "Snowy" {
-                fill(ctx, 0., 0., 100., 10., Color::Rgb(219, 228, 223));
             }
         });
     if h > 0 {
