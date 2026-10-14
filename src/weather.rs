@@ -302,6 +302,71 @@ fn square_viewport(area: Rect, aspect: f64) -> Rect {
         height,
     )
 }
+fn schoolgirl(ctx: &mut Raster, mode: &str, t: f64) {
+    let x = 48.
+        + if mode == "Windy" {
+            (t * 2.).sin() * 1.5
+        } else {
+            (t * 1.5).sin() * 0.5
+        };
+    let hair = Color::Rgb(64, 49, 47);
+    let skin = Color::Rgb(240, 210, 182);
+    let blouse = Color::Rgb(237, 229, 211);
+    let navy = Color::Rgb(49, 66, 89);
+    let ribbon = Color::Rgb(172, 100, 110);
+    // Simple chibi silhouette: bob haircut, sailor collar, pleated skirt, and shoes.
+    fill(ctx, x - 10., 44., 20., 23., hair);
+    fill(ctx, x - 7., 48., 14., 13., skin);
+    fill(ctx, x - 10., 61., 20., 5., hair);
+    fill(ctx, x - 8., 57., 3., 6., hair);
+    fill(ctx, x - 4., 54., 1.7, 1.7, hair);
+    fill(ctx, x + 3., 54., 1.7, 1.7, hair);
+    fill(ctx, x - 1., 50., 3., 1., ribbon);
+    fill(ctx, x - 8., 30., 16., 16., blouse);
+    fill(ctx, x - 8., 42., 16., 4., navy);
+    fill(ctx, x - 2., 36., 4., 7., ribbon);
+    fill(ctx, x - 12., 28., 4., 15., blouse);
+    fill(ctx, x - 12., 25., 4., 4., skin);
+    if mode == "Sunny" || mode == "Windy" {
+        let y = 49. + (t * 3.).sin() * 2.;
+        ctx.draw(&Stroke {
+            x1: x + 8.,
+            y1: 41.,
+            x2: x + 13.,
+            y2: y,
+            color: blouse,
+        });
+        fill(ctx, x + 12., y, 3., 4., skin);
+    } else {
+        fill(ctx, x + 8., 28., 4., 15., blouse);
+        fill(ctx, x + 8., 25., 4., 4., skin);
+    }
+    for y in 0..10 {
+        let width = 18. + (9 - y) as f64 * 0.6;
+        fill(ctx, x - width / 2., 20. + y as f64, width, 1., navy);
+    }
+    for dx in [-6., 2.] {
+        fill(ctx, x + dx, 12., 4., 8., skin);
+        fill(ctx, x + dx - 1., 9., 6., 4., hair);
+    }
+    if mode == "Snowy" {
+        fill(ctx, x - 10., 41., 20., 4., ribbon);
+        fill(ctx, x + 6., 33., 4., 10., ribbon);
+    }
+    if mode == "Rainy" {
+        for y in 0..9 {
+            let half = (81. - (y as f64).powi(2)).sqrt() * 1.6;
+            fill(ctx, x + 13. - half, 70. + y as f64, half * 2., 1., ribbon);
+        }
+        ctx.draw(&Stroke {
+            x1: x + 13.,
+            y1: 70.,
+            x2: x + 13.,
+            y2: 36.,
+            color: hair,
+        });
+    }
+}
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let weather = &app.weather;
     let b = block(" WEATHER · W ", app.panel == 3);
@@ -344,8 +409,14 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         Rect::new(inner.x, inner.y + 1, inner.width, 2.min(inner.height - 1)),
     );
     let available = inner.height.saturating_sub(6);
+    let compact_width = (inner.width * 3 / 4).min(36);
     let art = square_viewport(
-        Rect::new(inner.x, inner.y + 3, inner.width, available),
+        Rect::new(
+            inner.x + (inner.width - compact_width) / 2,
+            inner.y + 4.min(available),
+            compact_width,
+            available.saturating_sub(1).min(14),
+        ),
         app.cell_aspect,
     );
     let h = art.height;
@@ -475,6 +546,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 }
             }
         }
+        schoolgirl(ctx, mode, t);
         for row in 0..art.height {
             for col in 0..art.width {
                 let top = raster.average(col as usize * SAMPLES, row as usize * SAMPLES * 2);

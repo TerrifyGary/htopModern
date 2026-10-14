@@ -46,7 +46,7 @@ Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock
 - **LOFI · L:** generated animated Fireplace, Beach, and Coffee Shop scenes; previous/next scene buttons; flip-style digital clock using device time. No GIF dependency.
 - **MUSIC · M:** animated music bars, track and artist, playback timing on its own line, and selectable previous/play-pause/next buttons.
 - **TODO · T:** an Add item button with task entry, selectable checkboxes and trash buttons, with persistent local storage planned.
-- **WEATHER · W:** editable location defaulting to Taipei; animated sunshine, drifting clouds, wind, rain, and snow, with day/night backgrounds chosen automatically. The schoolgirl character is deferred. No manual weather or night buttons.
+- **WEATHER · W:** editable location defaulting to Taipei; animated sunshine, drifting clouds, wind, rain, and snow, with day/night backgrounds chosen automatically. A compact schoolgirl character is included, with an umbrella in rain and scarf in snow. No manual weather or night buttons.
 - Terminal app fills the terminal window and responds to resizing, adapting CPU meters and panel layout to available rows and columns.
 - Configurable prefix shortcuts, initially `Ctrl+B` followed by `L`, `M`, `T`, or `W`; arrows select controls and Enter activates them. The prefix must be configurable to avoid conflicts with tmux.
 
@@ -69,3 +69,5 @@ The prototype uses [Open-Meteo](https://open-meteo.com/) geocoding and current w
 Target Mac hardware, preferred terminal, music player, implementation language, and final project name remain to be confirmed.
 
 Weather scenes use a centered square viewport based on terminal pixel/cell dimensions when reported. If the terminal does not report pixels, a 2.3:1 cell ratio is assumed; use `cargo run --locked -- --cell-aspect 2.3` or set `HTOPMODERN_CELL_ASPECT=2.3` (cell height divided by cell width) to calibrate your font. Weather artwork uses supersampled color blending; its final detail is still limited by character cells.
+
+The weather illustration is compact (up to 36 columns and 14 rows), preserving the calibrated square aspect ratio.
