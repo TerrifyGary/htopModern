@@ -1,7 +1,7 @@
 use crate::{block, App, AMBER, CREAM};
 use chrono::{Local, Timelike};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Style},
     symbols::Marker,
     text::{Line, Span},
@@ -33,18 +33,30 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         f.render_widget(Paragraph::new(NAMES[app.scene]), inner);
         return;
     }
-    let clock_height = if inner.height >= 8 { 4 } else { 0 };
-    let chunks = Layout::vertical([
-        Constraint::Min(1),
-        Constraint::Length(3),
-        Constraint::Length(clock_height),
-    ])
-    .split(inner);
+    let clock_height = if inner.height >= 12 && inner.width >= 23 {
+        8
+    } else {
+        1
+    };
+    let available = inner.height.saturating_sub(clock_height + 3);
+    let scene_area = square_area(Rect::new(inner.x, inner.y, inner.width, available));
+    let control_area = Rect::new(
+        inner.x,
+        inner.y + available,
+        inner.width,
+        3.min(inner.height),
+    );
+    let clock_area = Rect::new(
+        inner.x,
+        control_area.y + control_area.height,
+        inner.width,
+        clock_height,
+    );
     let time = app.started.elapsed().as_secs_f64();
     let canvas = Canvas::default()
         .marker(Marker::HalfBlock)
         .x_bounds([0., 100.])
-        .y_bounds([0., 70.])
+        .y_bounds([-15., 85.])
         .paint(|ctx| match app.scene {
             0 => {
                 fill_rect(
@@ -268,7 +280,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 }
             }
         });
-    f.render_widget(canvas, chunks[0]);
+    f.render_widget(canvas, scene_area);
     let selected = Style::default().fg(AMBER);
     let plain = Style::default().fg(CREAM);
     let controls = Line::from(vec![
@@ -292,7 +304,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     ]);
     f.render_widget(
         Paragraph::new(vec![
-            Line::from(if clock_height == 0 {
+            Line::from(if clock_height == 1 {
                 format!("{} · {}", NAMES[app.scene], Local::now().format("%H:%M"))
             } else {
                 NAMES[app.scene].to_string()
@@ -300,57 +312,93 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             controls,
             Line::from("←→ select · Enter switch"),
         ]),
-        chunks[1],
+        control_area,
     );
     let now = Local::now();
-    if clock_height > 0 {
-        let sections =
-            Layout::horizontal([Constraint::Length(12), Constraint::Min(1)]).split(chunks[2]);
-        let clock = Canvas::default()
-            .marker(Marker::Braille)
-            .x_bounds([-1.3, 1.3])
-            .y_bounds([-1.3, 1.3])
-            .paint(|ctx| {
-                ctx.draw(&Circle {
-                    x: 0.,
-                    y: 0.,
-                    radius: 1.,
-                    color: AMBER,
-                });
-                for n in 0..12 {
-                    let a = n as f64 * std::f64::consts::TAU / 12.;
-                    ctx.draw(&Stroke {
-                        x1: a.sin() * 0.9,
-                        y1: a.cos() * 0.9,
-                        x2: a.sin(),
-                        y2: a.cos(),
-                        color: AMBER,
-                    });
-                }
-                let seconds = now.second() as f64;
-                for (angle, length, color) in [
-                    (
-                        now.hour() as f64 / 12. + now.minute() as f64 / 720.,
-                        0.5,
-                        CREAM,
-                    ),
-                    (now.minute() as f64 / 60. + seconds / 3600., 0.8, CREAM),
-                    (seconds / 60., 0.85, Color::Rgb(172, 101, 112)),
-                ] {
-                    let a = angle * std::f64::consts::TAU;
-                    ctx.draw(&Stroke {
-                        x1: 0.,
-                        y1: 0.,
-                        x2: a.sin() * length,
-                        y2: a.cos() * length,
-                        color,
-                    });
-                }
-            });
-        f.render_widget(clock, sections[0]);
+    if clock_height == 8 {
+        flip_clock(f, clock_area, now.hour(), now.minute(), now.second());
+    } else {
         f.render_widget(
-            Paragraph::new(format!("\n{}\nDevice time", now.format("%H:%M:%S"))),
-            sections[1],
+            Paragraph::new(now.format("%H:%M:%S").to_string()).style(Style::default().fg(AMBER)),
+            clock_area,
         );
+    }
+}
+
+// Most terminal cells are roughly twice as tall as wide.
+fn square_area(area: Rect) -> Rect {
+    let height = area.height.min(area.width / 2);
+    let width = height * 2;
+    Rect::new(
+        area.x + (area.width - width) / 2,
+        area.y + (area.height - height) / 2,
+        width,
+        height,
+    )
+}
+
+fn flip_clock(f: &mut Frame, area: Rect, hour: u32, minute: u32, second: u32) {
+    const DIGITS: [[&str; 5]; 10] = [
+        ["███", "█ █", "█ █", "█ █", "███"],
+        [" █ ", "██ ", " █ ", " █ ", "███"],
+        ["███", "  █", "███", "█  ", "███"],
+        ["███", "  █", "███", "  █", "███"],
+        ["█ █", "█ █", "███", "  █", "  █"],
+        ["███", "█  ", "███", "  █", "███"],
+        ["███", "█  ", "███", "█ █", "███"],
+        ["███", "  █", "  █", "  █", "  █"],
+        ["███", "█ █", "███", "█ █", "███"],
+        ["███", "█ █", "███", "  █", "███"],
+    ];
+    let time = if area.width >= 36 {
+        format!("{hour:02}{minute:02}{second:02}")
+    } else {
+        format!("{hour:02}{minute:02}")
+    };
+    let digits: Vec<_> = time
+        .chars()
+        .map(|c| c.to_digit(10).unwrap() as usize)
+        .collect();
+    let mut rows = Vec::new();
+    for row in 0..7 {
+        let mut text = String::new();
+        for (i, &digit) in digits.iter().enumerate() {
+            if i > 0 && i % 2 == 0 {
+                text.push_str(if row == 2 || row == 4 { " : " } else { "   " });
+            }
+            text.push_str(&match row {
+                0 => "┌───┐".to_owned(),
+                6 => "└───┘".to_owned(),
+                3 => format!("├{}┤", DIGITS[digit][2]),
+                n => format!("│{}│", DIGITS[digit][n - 1]),
+            });
+        }
+        rows.push(Line::styled(text, Style::default().fg(CREAM)));
+    }
+    rows.push(Line::styled(
+        "Device time · 24h",
+        Style::default().fg(AMBER),
+    ));
+    let width = (digits.len() * 5 + (digits.len() / 2 - 1) * 3) as u16;
+    let rect = Rect::new(
+        area.x + (area.width.saturating_sub(width)) / 2,
+        area.y,
+        width.min(area.width),
+        area.height,
+    );
+    f.render_widget(Paragraph::new(rows), rect);
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn square_fits_available_space() {
+        for (w, h) in [(44, 30), (80, 7), (1, 1), (0, 0)] {
+            let area = Rect::new(3, 4, w, h);
+            let square = square_area(area);
+            assert_eq!(square.width, square.height * 2);
+            assert!(square.right() <= area.right());
+            assert!(square.bottom() <= area.bottom());
+        }
     }
 }
