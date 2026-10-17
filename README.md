@@ -86,7 +86,7 @@ YouTube in Firefox requires a separate browser bridge and is not supported in th
 
 `cargo run --locked -- --music-check` performs a read-only Apple Music connection check.
 
-The MUSIC panel includes a CD above the track information. It rotates while playback is reported as playing and holds its angle when paused or stopped (external changes are detected on the next two-second poll). Small panels hide the CD to preserve playback controls.
+The MUSIC panel includes a CD above the track information. It rotates while playback is reported as playing and holds its angle when paused or stopped (external changes are detected on the next playback poll (roughly 750 ms plus automation time)). Small panels hide the CD to preserve playback controls.
 
 
 MUSIC uses centered song details and playback buttons with a bold title and a read-only progress line. The dot follows playback and freezes when paused. Lyrics and playback-state/help labels are removed; connection errors remain visible. Terminal text uses the configured terminal font size.
@@ -94,3 +94,5 @@ MUSIC uses centered song details and playback buttons with a bold title and a re
 MUSIC is focused on startup. Panels are ordered LOFI → MUSIC → WEATHER → TODO, and Tab follows that same order.
 
 LOFI, MUSIC, and WEATHER share a common animation/info boundary: their dashed separators and first information rows align. WEATHER places the animation above centered location and readings.
+
+Playback controls use a separate fast AppleScript path and a serialized command queue, so metadata polling does not discard button presses. Older poll results are ignored after a command, and playback state is refreshed about every 750 ms. Apple Music streaming/buffering and macOS automation can still add latency.

@@ -8,6 +8,7 @@ use ratatui::{
 };
 use serde::Deserialize;
 use std::{
+    collections::VecDeque,
     io::Read,
     process::{Command, Stdio},
     sync::mpsc::{self, Receiver},
@@ -44,9 +45,9 @@ impl Action {
         }
     }
 }
-pub fn query(action: Action) -> Result<Reply, String> {
+fn script_output(script: &str, language: &str, argument: &str) -> Result<String, String> {
     let mut child = Command::new("/usr/bin/osascript")
-        .args(["-l", "JavaScript", "-e", SCRIPT, action.name()])
+        .args(["-l", language, "-e", script, argument])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
@@ -75,7 +76,7 @@ pub fn query(action: Action) -> Result<Reply, String> {
             let _ = child.wait();
             return Err("Music timed out · check Automation permission; R retries".into());
         }
-        std::thread::sleep(Duration::from_millis(25));
+        std::thread::sleep(Duration::from_millis(5));
     };
     let output = reader
         .join()
@@ -86,6 +87,10 @@ pub fn query(action: Action) -> Result<Reply, String> {
             "Music unavailable · allow terminal → Music in macOS Automation; R retries".into(),
         );
     }
+    Ok(output)
+}
+pub fn query(action: Action) -> Result<Reply, String> {
+    let output = script_output(SCRIPT, "JavaScript", action.name())?;
     let reply: Reply = serde_json::from_str(output.trim())
         .map_err(|_| "Could not read Apple Music playback".to_string())?;
     if let Some(track) = &reply.track {
@@ -95,12 +100,26 @@ pub fn query(action: Action) -> Result<Reply, String> {
     }
     Ok(reply)
 }
+fn control(action: Action) -> Result<(), String> {
+    let command = match action {
+        Action::Previous => "previous track",
+        Action::Toggle => "playpause",
+        Action::Next => "next track",
+        Action::Read => return Ok(()),
+    };
+    let script=format!("if application \"Music\" is running then\n tell application \"Music\" to {command}\nelse\n error \"Open Apple Music first\"\nend if");
+    script_output(&script, "AppleScript", "").map(|_| ())
+}
 pub struct Music {
     pub selected: usize,
     track: Option<Track>,
     pub status: String,
     pending: Option<Receiver<Result<Reply, String>>>,
     last: Instant,
+    commands: VecDeque<Action>,
+    control_pending: Option<Receiver<Result<(), String>>>,
+    epoch: u64,
+    pending_epoch: u64,
     observed: Instant,
     failed: bool,
     spin_phase: f64,
@@ -115,6 +134,10 @@ impl Music {
             status: "Apple Music · waiting for connection".into(),
             pending: None,
             last: Instant::now(),
+            commands: VecDeque::new(),
+            control_pending: None,
+            epoch: 0,
+            pending_epoch: 0,
             observed: Instant::now(),
             failed: false,
             spin_phase: 0.,
@@ -123,15 +146,34 @@ impl Music {
         }
     }
     pub fn request(&mut self, action: Action) {
+        if !matches!(action, Action::Read) {
+            self.commands.push_back(action);
+            self.epoch = self.epoch.wrapping_add(1);
+            self.start_control();
+            return;
+        }
         if self.pending.is_some() {
             return;
         }
         self.last = Instant::now();
         let (tx, rx) = mpsc::channel();
         self.pending = Some(rx);
+        self.pending_epoch = self.epoch;
         std::thread::spawn(move || {
             let _ = tx.send(query(action));
         });
+    }
+    fn start_control(&mut self) {
+        if self.control_pending.is_some() {
+            return;
+        }
+        if let Some(action) = self.commands.pop_front() {
+            let (tx, rx) = mpsc::channel();
+            self.control_pending = Some(rx);
+            std::thread::spawn(move || {
+                let _ = tx.send(control(action));
+            });
+        }
     }
     fn advance_spin(&mut self, seconds: f64) {
         if self.track.as_ref().is_some_and(|t| t.playing) {
@@ -163,6 +205,27 @@ impl Music {
     pub fn tick(&mut self) {
         self.advance_spin(self.spin_updated.elapsed().as_secs_f64());
         self.spin_updated = Instant::now();
+        let command_result = self
+            .control_pending
+            .as_ref()
+            .and_then(|rx| match rx.try_recv() {
+                Ok(r) => Some(r),
+                Err(mpsc::TryRecvError::Disconnected) => {
+                    Some(Err("Music control disconnected · R retries".into()))
+                }
+                Err(_) => None,
+            });
+        if let Some(result) = command_result {
+            self.control_pending = None;
+            match result {
+                Ok(()) => {
+                    self.failed = false;
+                    self.last = Instant::now() - Duration::from_secs(2);
+                }
+                Err(error) => self.apply(Err(error)),
+            }
+            self.start_control();
+        }
         let result = self.pending.as_ref().and_then(|rx| match rx.try_recv() {
             Ok(r) => Some(r),
             Err(mpsc::TryRecvError::Disconnected) => {
@@ -172,9 +235,19 @@ impl Music {
         });
         if let Some(result) = result {
             self.pending = None;
-            self.apply(result);
+            if self.pending_epoch == self.epoch
+                && self.control_pending.is_none()
+                && self.commands.is_empty()
+            {
+                self.apply(result);
+            }
         }
-        if self.pending.is_none() && !self.failed && self.last.elapsed() >= Duration::from_secs(2) {
+        if self.pending.is_none()
+            && self.control_pending.is_none()
+            && self.commands.is_empty()
+            && !self.failed
+            && self.last.elapsed() >= Duration::from_millis(750)
+        {
             self.request(Action::Read);
         }
     }
@@ -425,6 +498,35 @@ mod tests {
         assert_eq!(progress_line(5, 200., 100.), "────●");
         assert_eq!(progress_line(0, 0., 100.), "");
         assert_eq!(progress_line(5, 0., 0.), "─────");
+    }
+    #[test]
+    fn controls_are_retained_and_stale_reads_cannot_undo_them() {
+        let mut music = Music::new();
+        music.track = Some(Track {
+            title: "Song".into(),
+            artist: "Artist".into(),
+            playing: true,
+            position: 0.,
+            duration: 100.,
+        });
+        let (_control_tx, control_rx) = mpsc::channel();
+        music.control_pending = Some(control_rx);
+        let (read_tx, read_rx) = mpsc::channel();
+        music.pending = Some(read_rx);
+        music.pending_epoch = 0;
+        music.request(Action::Toggle);
+        music.request(Action::Next);
+        assert_eq!(music.commands.len(), 2);
+        assert_eq!(music.epoch, 2);
+        read_tx
+            .send(Ok(Reply {
+                track: None,
+                status: "old".into(),
+            }))
+            .unwrap();
+        music.tick();
+        assert!(music.track.as_ref().unwrap().playing);
+        assert_eq!(music.commands.len(), 2);
     }
     #[test]
     fn equalizer_is_tall_thin_and_fills_width() {
