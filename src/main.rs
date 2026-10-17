@@ -257,7 +257,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
     let cpus = app.sys.cpus();
     let rows = cpus.len().div_ceil(cols);
     let mut lines = Vec::new();
-    for row in 0..rows.min(usize::from(inner.height).saturating_sub(9)) {
+    for row in 0..rows.min(usize::from(inner.height).saturating_sub(11)) {
         let mut text = String::new();
         for col in 0..cols {
             let i = col * rows + row;
@@ -280,6 +280,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
             Style::default().fg(Color::Rgb(107, 101, 86)),
         )
     };
+    lines.push(Line::from(""));
     lines.push(separator());
     lines.push(Line::from(""));
     let gb = 1_073_741_824.;
@@ -306,6 +307,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
         .centered(),
     );
     lines.push(Line::from(format!("Uptime {}   CPU temp: unavailable", uptime_label())).centered());
+    lines.push(Line::from(""));
     lines.push(separator());
     lines.push(Line::from(""));
     lines.push(
@@ -396,7 +398,7 @@ fn ui(f: &mut Frame, app: &App) {
         .cpus()
         .len()
         .div_ceil((usize::from(area.width) / 27).max(1));
-    let top = (rows + 13).min(usize::from(area.height) / 2).max(6) as u16;
+    let top = (rows + 15).min(usize::from(area.height) / 2).max(6) as u16;
     let parts = Layout::vertical([
         Constraint::Length(top),
         Constraint::Length(1),
