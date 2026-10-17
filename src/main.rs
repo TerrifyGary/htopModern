@@ -420,6 +420,11 @@ fn cell_aspect() -> f64 {
 }
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
+    if args.iter().any(|arg| arg == "--version" || arg == "-V") {
+        println!("htopmodern {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+
     if args.iter().any(|arg| arg == "--temperature-check") {
         let reading = temperature::sample().map_err(io::Error::other)?;
         println!(

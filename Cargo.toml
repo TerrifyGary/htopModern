@@ -3,6 +3,9 @@ name = "htopmodern"
 version = "0.1.0"
 edition = "2021"
 description = "A cozy terminal dashboard for macOS"
+license = "MIT"
+repository = "https://github.com/TerrifyGary/htopModern"
+homepage = "https://github.com/TerrifyGary/htopModern"
 
 [dependencies]
 ratatui = "0.30"

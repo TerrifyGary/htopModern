@@ -1,127 +1,105 @@
 # htopModern
 
-A cozy, vintage-inspired macOS terminal dashboard combining htop-style system monitoring with animated scenes, music controls, todos, and weather.
+A cozy macOS terminal dashboard: live computer monitoring, animated lo-fi scenes, Apple Music controls, weather, and a persistent todo list.
 
-## Status
+## Install with Homebrew
 
-The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a flip-style digital clock are also implemented. Live weather with Celsius temperature, editable location, automatic day/night, and animated weather scenes are implemented. Apple Music playback info and controls are implemented. CPU/GPU temperatures are supported through the optional no-sudo macmon helper. Firefox/YouTube integration remains pending. The browser prototype remains the visual reference.
-
-## Run the terminal app
-
-With a stable Rust toolchain installed:
+For Apple Silicon Macs with Homebrew installed:
 
 ```sh
-cargo run --locked
-```
-
-To install the command:
-
-```sh
-cargo install --path . --locked
-htopmodern
-```
-
-Cargo installs the executable in `~/.cargo/bin`; that directory must be on your `PATH`.
-
-Use `Ctrl+B` then `L`, `M`, `T`, or `W` to choose a panel, or use Tab. In LOFI, Left/Right selects Previous/Next and Enter changes scene. Scenes use a centered square viewport, accounting for typical terminal cell proportions. The flip-style clock uses device local time in 24-hour format; compact panels show a single-line clock. In WEATHER, Enter or `E` edits the city; Enter submits and Escape cancels. `R` refreshes. Readings are refreshed every ten minutes and cached in `weather.json` alongside todos. Loading and offline states are labeled, and the weather scene stays visible. Requests run in background threads using macOS `/usr/bin/curl`. Location lookup selects the first matching city and displays its resolved country. In TODO, press `A` or select **Add item** and press Enter. Up/Down selects a task, Left/Right selects its checkbox or Delete, and Enter activates it. Enter saves a new task; Escape cancels. `Q` or Ctrl+C exits. In tmux, use Tab for now because tmux intercepts Ctrl+B; configurable prefixes are planned.
-
-Todos are saved to `~/Library/Application Support/htopmodern/todos.json`. Set `HTOPMODERN_DATA_DIR` to override the storage directory. Invalid storage files are reported rather than overwritten. Narrow terminals show the selected bottom panel; widths of at least 110 columns show all four.
-
-```sh
-cargo run --locked -- --check  # read-only system snapshot
-cargo test --locked
-```
-
-## Preview
-
-![Current dashboard design preview](docs/images/dashboard-preview.png)
-
-*Browser design prototype; system metrics and music information are illustrative.*
-
-Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock run locally. Weather uses Open-Meteo and requires internet access; Taipei is the default location. Weather loading errors are shown without hiding the character.
-
-## Agreed design
-
-- **COMPUTER:** individual CPU meters, memory and swap, task/thread counts, load averages, uptime, CPU temperature where supported, and a split system/hardware + top-three process view. The busiest processes show PID, name, CPU, and memory. No kill controls.
-- **LOFI · L:** generated animated Fireplace, Beach, and Coffee Shop scenes; previous/next scene buttons; flip-style digital clock using device time. No GIF dependency.
-- **MUSIC · M:** animated music bars, track and artist, playback timing on its own line, and selectable previous/play-pause/next buttons.
-- **TODO · T:** an Add item button with task entry, selectable checkboxes and trash buttons, with persistent local storage planned.
-- **WEATHER · W:** editable location defaulting to Taipei; animated sunshine, drifting clouds, wind, rain, and snow, with day/night backgrounds chosen automatically. The scene is a calm landscape with no character or animal. No manual weather or night buttons.
-- Terminal app fills the terminal window and responds to resizing, adapting CPU meters and panel layout to available rows and columns.
-- Configurable prefix shortcuts, initially `Ctrl+B` followed by `L`, `M`, `T`, or `W`; arrows select controls and Enter activates them. The prefix must be configurable to avoid conflicts with tmux.
-
-## Initial implementation milestones
-
-1. Choose the terminal rendering stack and test animation capabilities in the target terminal.
-2. Build a responsive full-screen terminal shell and read real macOS system/process metrics.
-3. Verify CPU temperature support on the target Mac.
-4. Add generated scenes, analog clock, and persistent todos.
-5. Integrate the user's music player and define whether bars are decorative or audio-reactive.
-6. Integrate location lookup, weather caching, automatic daylight selection, and offline handling.
-7. Package the executable and eventually offer Homebrew installation.
-
-## Weather service
-
-The prototype uses [Open-Meteo](https://open-meteo.com/) geocoding and current weather endpoints. It refreshes every ten minutes and uses the provider's `is_day` value for location-specific daylight. The provider offers free non-commercial API access; review its terms before commercial distribution.
-
-## Open decisions
-
-Target Mac hardware, preferred terminal, music player, implementation language, and final project name remain to be confirmed.
-
-Weather scenes use a centered square viewport based on terminal pixel/cell dimensions when reported. If the terminal does not report pixels, a 2.3:1 cell ratio is assumed; use `cargo run --locked -- --cell-aspect 2.3` or set `HTOPMODERN_CELL_ASPECT=2.3` (cell height divided by cell width) to calibrate your font. Weather artwork uses supersampled color blending; its final detail is still limited by character cells.
-
-The weather illustration is compact (up to 36 columns and 14 rows), preserving the calibrated square aspect ratio.
-
-Native weather graphics: on startup the app detects iTerm2, Kitty, or Sixel support. Supported terminals receive 1024×1024 image frames, encoded on a background thread at up to four frames per second and fitted into the compact square panel. Other terminals retain the half-block fallback. The footer reports the detected graphics protocol. Native image display is constrained by the panel’s physical pixel size; increasing source resolution cannot increase the display’s pixel density.
-
-WEATHER shows relative humidity (%) and chance of precipitation for the current forecast hour (%), alongside Celsius temperature. Rain chance includes all precipitation types, using Open-Meteo’s hourly probability. Missing values and older cache entries show “unavailable” until the next successful refresh.
-
-## Music
-
-MUSIC reads the Apple Music app’s current title, artist, playback position, duration, and playing/paused state. Left/Right selects Previous, Play/Pause, or Next; Enter activates the selected control. `R` retries a failed connection. Polling and commands run in background workers; the bars are decorative playback indicators, not an audio spectrum. The app does not launch Music automatically.
-
-macOS may ask for permission for your terminal to control Music. If denied, enable that terminal’s access to Music in System Settings → Privacy & Security → Automation, then press `R`. The panel shows a connection error instead of retaining stale playback information.
-
-YouTube in Firefox requires a separate browser bridge and is not supported in this milestone. No browser settings or extensions are changed automatically.
-
-`cargo run --locked -- --music-check` performs a read-only Apple Music connection check.
-
-The MUSIC panel includes a CD above the track information. It rotates while playback is reported as playing and holds its angle when paused or stopped (external changes are detected on the next playback poll (roughly 750 ms plus automation time)). Small panels hide the CD to preserve playback controls.
-
-
-MUSIC uses centered song details and playback buttons with a bold title and a read-only progress line. The dot follows playback and freezes when paused. Lyrics and playback-state/help labels are removed; connection errors remain visible. Terminal text uses the configured terminal font size.
-
-MUSIC is focused on startup. Panels are ordered LOFI → MUSIC → WEATHER → TODO, and Tab follows that same order.
-
-LOFI, MUSIC, and WEATHER share a common animation/info boundary: their dashed separators and first information rows align. WEATHER places the animation above centered location and readings.
-
-Playback controls use a separate fast AppleScript path and a serialized command queue, so metadata polling does not discard button presses. Older poll results are ignored after a command, and playback state is refreshed about every 750 ms. Apple Music streaming/buffering and macOS automation can still add latency.
-
-## Short command and themes
-
-After `cargo install --path . --locked`, run `htopmodern` directly. On this development Mac, `htm` is also installed as a short launcher. To create the same shortcut elsewhere:
-
-```sh
-ln -s htopmodern ~/.cargo/bin/htm
+brew install TerrifyGary/tap/htopmodern
 htm
 ```
 
-A shell alias is another option: `alias htm='htopmodern'`. A launcher/symlink works across shells without editing shell startup files.
+`htopmodern` is also installed. This first release builds from source, so installation takes longer than installing a prebuilt package. Homebrew handles Rust and the `macmon` temperature helper automatically. No sudo password is needed for the app’s sensor readings.
 
-Press **F2** to cycle **Vintage Amber**, **Forest**, **Ocean**, **Rose**, and **Mono**. Or launch with `htm --theme ocean`. Themes and an explicit cell-aspect override are saved in `settings.json` alongside todos, so subsequent launches need no flags. Themes recolor dashboard chrome and controls while preserving the scene artwork’s colors.
+```sh
+brew upgrade TerrifyGary/tap/htopmodern
+brew uninstall htopmodern
+```
 
-## Computer details and temperature
+Uninstalling keeps your personal tasks, settings, and weather cache. Release 0.1.0 has been tested on an Apple Silicon Mac running macOS 26.6.2; other macOS versions and terminal graphics implementations have not all been verified. Intel Macs and Linux are not supported by the initial Homebrew formula.
 
-COMPUTER is divided into per-core CPU meters, system/hardware details, and the top three processes by CPU usage. Wide terminals show hardware and processes side by side; narrow terminals use a compact stacked view. Details include host, macOS and architecture, chip, physical/logical cores, memory usage and free memory, swap, load averages, uptime, and supported thermal/power readings. Process CPU can exceed 100% when using several cores.
+## Features
 
-Temperature uses the optional [macmon](https://github.com/vladkens/macmon) executable on Apple Silicon. Install with `cargo install macmon --locked` or `brew install macmon`. No sudo, stored password, or sudoers change is required. The app samples CPU/GPU temperature and power in the background every five seconds. Hardware/OS compatibility can vary; failures display a sensor status rather than fabricated readings. Verify with `htm --temperature-check`.
+- **COMPUTER:** per-core CPU meters; system/hardware details; memory, swap, load and uptime; CPU/GPU temperature and power through `macmon`; top three processes with highlighted PID, name, CPU, and memory. Process CPU can exceed 100% across multiple cores. No kill controls.
+- **LOFI:** animated Fireplace, Beach, and Coffee Shop scenes plus a flip-style clock using device time.
+- **MUSIC:** Apple Music track info, spinning CD, decorative equalizer, moving progress dot, and Previous/Play-Pause/Next controls. Playback controls run independently of metadata polling.
+- **WEATHER:** editable location defaulting to Taipei, Celsius temperature, humidity, hourly precipitation probability, automatic daylight selection, and a compact animated landscape. Refreshes every ten minutes and labels cached/offline readings.
+- **TODO:** add, complete, and delete tasks, saved locally.
+- **THEMES:** Amber, Forest, Ocean, Rose, and Mono, with saved preferences.
 
-## LOFI ideas under discussion
+Panels are ordered LOFI → MUSIC → WEATHER → TODO. MUSIC is focused at startup. Wide terminals show all four; narrow terminals show the selected panel. Animation/info dividers align across panels.
 
-- **Mountain Dawn:** slow sunrise, soft fog between ridges, and warm sky colors.
-- **Mountain Sunset:** amber-to-purple sky, a lake reflection, then stars.
-- **Rainy Cabin:** window droplets, a warm lamp, and distant trees.
-- **Night Train:** passing lights beyond a window and a gently swaying cup.
-- **Ocean Moonlight:** subdued waves and a moonlit reflection.
+## Keyboard controls
 
-These are proposed scenes; the implemented scenes remain Fireplace, Beach, and Coffee Shop.
+| Key | Action |
+| --- | --- |
+| `Q` or `Ctrl+C` | Quit; in text entry, `Esc` cancels, then `Q` quits |
+| `Tab` / `Shift+Tab` | Next / previous panel |
+| `Ctrl+B`, then `L` / `M` / `W` / `T` | Focus a panel |
+| `F2` | Cycle and save theme (some Macs require `Fn+F2`) |
+| LOFI or MUSIC: `Left` / `Right`, `Enter` | Select and activate a playback/scene button |
+| MUSIC: `R` | Refresh/retry Apple Music |
+| WEATHER: `Enter` or `E` | Edit city; `Enter` submits, `Esc` cancels |
+| WEATHER: `R` | Refresh weather |
+| TODO: `A` | Add item |
+| TODO: `Up` / `Down` | Select task or Add item |
+| TODO: `Left` / `Right`, `Enter` | Select checkbox/Delete and activate |
+
+In tmux, use Tab because tmux intercepts `Ctrl+B`; configurable prefixes are planned.
+
+```sh
+htm --theme ocean
+htm --cell-aspect 2.3
+htm --version
+htm --help
+```
+
+Themes and explicit aspect overrides are saved. Terminal character proportions differ: `--cell-aspect` is cell height divided by width and calibrates square graphics. The default fallback is 2.3 when pixel dimensions are unavailable.
+
+## Apple Music and graphics
+
+Start a track in Apple Music. macOS may ask permission for your terminal to control Music. If denied, allow the terminal → Music under **System Settings → Privacy & Security → Automation**, then press `R` in MUSIC. The app does not launch Music automatically. Apple Music streaming/buffering can still add playback latency. YouTube in Firefox requires a separate bridge and is not supported yet.
+
+Weather detects iTerm2, Kitty, or Sixel image support and uses 1024×1024 source frames, encoded in the background at up to four frames per second. Unsupported terminals use colored half-blocks. The footer reports the graphics protocol. LOFI and CD graphics use character cells. The terminal’s physical pixels and font size limit visible detail.
+
+## Data and services
+
+Personal data is stored in `~/Library/Application Support/htopmodern/`:
+
+- `todos.json` — tasks
+- `settings.json` — theme and cell proportions
+- `weather.json` — last successful location/weather response
+
+Set `HTOPMODERN_DATA_DIR` to use another directory. Existing invalid todo files are reported rather than overwritten. The app contacts [Open-Meteo](https://open-meteo.com/) for the city you enter and displays the first matching city/country. Precipitation probability includes rain and other precipitation types for the current forecast hour. Missing values display as unavailable. Review Open-Meteo’s terms before commercial use. Temperature readings depend on hardware/macOS support in [macmon](https://github.com/vladkens/macmon).
+
+## Build and check from source
+
+```sh
+git clone https://github.com/TerrifyGary/htopModern.git
+cd htopModern
+cargo run --locked
+cargo install --path . --locked
+```
+
+When building outside Homebrew, install `macmon` separately for temperature: `cargo install macmon --locked` or `brew install macmon`.
+
+```sh
+cargo test --locked
+cargo clippy --locked -- -D warnings
+cargo run --locked -- --check
+cargo run --locked -- --temperature-check
+cargo run --locked -- --music-check
+cargo run --locked -- --weather-check Taipei
+```
+
+## Design reference
+
+![Original browser design prototype](docs/images/dashboard-preview.png)
+
+The original browser prototype above guided the layout; the terminal app has since evolved. `cozy-terminal-preview.html` remains available as a design reference.
+
+## License
+
+[MIT](LICENSE). Dependencies retain their respective licenses.
