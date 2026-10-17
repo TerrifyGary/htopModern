@@ -354,38 +354,44 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     }
     lines.push(divider());
     if let Some(track) = &music.track {
-        lines.push(Line::from(track.title.clone()));
-        lines.push(Line::from(track.artist.clone()));
-        lines.push(Line::from(format!(
-            "{} / {}",
-            clock(music.position()),
-            if track.duration > 0. {
-                clock(track.duration)
-            } else {
-                "LIVE".into()
-            }
-        )));
+        lines.push(Line::from(track.title.clone()).centered());
+        lines.push(Line::from(track.artist.clone()).centered());
+        lines.push(
+            Line::from(format!(
+                "{} / {}",
+                clock(music.position()),
+                if track.duration > 0. {
+                    clock(track.duration)
+                } else {
+                    "LIVE".into()
+                }
+            ))
+            .centered(),
+        );
     } else {
-        lines.push(Line::from("No active track"));
+        lines.push(Line::from("No active track").centered());
     }
     lines.push(Line::from(""));
     let labels = ["[⏮]", if playing { "[⏸]" } else { "[▶]" }, "[⏭]"];
-    lines.push(Line::from(
-        labels
-            .iter()
-            .enumerate()
-            .map(|(i, label)| {
-                Span::styled(
-                    format!("{label} "),
-                    Style::default().fg(if app.panel == 1 && music.selected == i {
-                        AMBER
-                    } else {
-                        CREAM
-                    }),
-                )
-            })
-            .collect::<Vec<_>>(),
-    ));
+    lines.push(
+        Line::from(
+            labels
+                .iter()
+                .enumerate()
+                .map(|(i, label)| {
+                    Span::styled(
+                        format!("{}{label}", if i > 0 { " " } else { "" }),
+                        Style::default().fg(if app.panel == 1 && music.selected == i {
+                            AMBER
+                        } else {
+                            CREAM
+                        }),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
+        .centered(),
+    );
     lines.push(Line::from("←→ select · Enter activate"));
     lines.push(Line::from("Apple Music · R refresh"));
     lines.push(Line::from(music.status.clone()));
