@@ -83,7 +83,7 @@ impl App {
             sys: System::new(),
             tasks,
             path,
-            panel: 2,
+            panel: 1,
             selected: 0,
             action: 0,
             input: None,
@@ -204,8 +204,8 @@ impl App {
             KeyCode::Enter if self.panel == 0 => {
                 self.scene = (self.scene + if self.lofi_action == 0 { 2 } else { 1 }) % 3
             }
-            KeyCode::Tab => self.panel = (self.panel + 1) % 4,
-            KeyCode::BackTab => self.panel = (self.panel + 3) % 4,
+            KeyCode::Tab => self.panel = [1, 3, 0, 2][self.panel],
+            KeyCode::BackTab => self.panel = [2, 0, 3, 1][self.panel],
             KeyCode::Char('a') if self.panel == 2 => self.input = Some(String::new()),
             KeyCode::Up if self.panel == 2 => self.selected = self.selected.saturating_sub(1),
             KeyCode::Down if self.panel == 2 => {
@@ -395,15 +395,15 @@ fn ui(f: &mut Frame, app: &App) {
     computer(f, parts[0], app);
     if area.width >= 110 {
         let panels = Layout::horizontal([Constraint::Percentage(25); 4]).split(parts[2]);
-        for i in 0..4 {
+        for (slot, i) in [0, 1, 3, 2].into_iter().enumerate() {
             if i == 0 {
-                lofi::draw(f, panels[i], app);
+                lofi::draw(f, panels[slot], app);
             } else if i == 3 {
-                weather::draw(f, panels[i], app);
+                weather::draw(f, panels[slot], app);
             } else if i == 2 {
-                todos(f, panels[i], app);
+                todos(f, panels[slot], app);
             } else {
-                music::draw(f, panels[i], app);
+                music::draw(f, panels[slot], app);
             }
         }
     } else if app.panel == 0 {
@@ -568,6 +568,7 @@ mod tests {
         let dir = env::temp_dir().join(format!("htopmodern-keys-{}", std::process::id()));
         let path = dir.join("todos.json");
         let mut app = App::new(path.clone()).unwrap();
+        app.panel = 2;
         let press = |app: &mut App, code| {
             app.key(KeyEvent::new(code, KeyModifiers::NONE));
         };

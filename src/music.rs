@@ -361,7 +361,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     lines.push(divider());
     // Keep the player group balanced in the remaining space.
     let gap = usize::from(sections[1].height).saturating_sub(lines.len() + 9) / 2;
-    lines.extend((0..gap).map(|_| Line::from("")));
+    lines.extend((0..gap + 1).map(|_| Line::from("")));
     if let Some(track) = &music.track {
         lines.push(
             Line::styled(

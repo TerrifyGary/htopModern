@@ -90,3 +90,5 @@ The MUSIC panel includes a CD above the track information. It rotates while play
 
 
 MUSIC uses centered song details and playback buttons with a bold title and a read-only progress line. The dot follows playback and freezes when paused. Lyrics and playback-state/help labels are removed; connection errors remain visible. Terminal text uses the configured terminal font size.
+
+MUSIC is focused on startup. Panels are ordered LOFI → MUSIC → WEATHER → TODO, and Tab follows that same order.
