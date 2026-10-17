@@ -266,23 +266,34 @@ fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
         }
     }
 }
+fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
+    // Give the disc the panel's full width, just as the LOFI scene does.
+    // Reserve track details and controls before allocating artwork or lyrics.
+    let minimum_lyrics = if show_lyrics && inner.height >= 23 {
+        3
+    } else {
+        0
+    };
+    let available = inner.height.saturating_sub(13 + minimum_lyrics);
+    let desired = (inner.width as f64 / aspect).floor() as u16;
+    let cd = if available >= 4 {
+        desired.min(available)
+    } else {
+        0
+    };
+    let lyrics = if minimum_lyrics > 0 {
+        inner.height.saturating_sub(cd + 13).min(8)
+    } else {
+        0
+    };
+    (cd, lyrics)
+}
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let music = &app.music;
     let b = block(" MUSIC · M ", app.panel == 1);
     let inner = b.inner(area);
     f.render_widget(b, area);
-    let cd_height = if inner.height >= 24 {
-        8
-    } else if inner.height >= 17 {
-        4
-    } else {
-        0
-    };
-    let lyrics_height = if music.show_lyrics && inner.height >= 23 {
-        inner.height.saturating_sub(cd_height + 13).clamp(3, 8)
-    } else {
-        0
-    };
+    let (cd_height, lyrics_height) = media_heights(inner, app.cell_aspect, music.show_lyrics);
     let sections = Layout::vertical([
         Constraint::Length(cd_height),
         Constraint::Min(1),
@@ -374,6 +385,15 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn cd_uses_full_panel_width_when_space_allows() {
+        let (cd, lyrics) = media_heights(Rect::new(0, 0, 46, 44), 2.3, true);
+        assert_eq!(cd, 20);
+        assert!(lyrics >= 3);
+        assert!(cd + lyrics + 13 <= 44);
+        let (small, _) = media_heights(Rect::new(0, 0, 25, 8), 2.3, true);
+        assert_eq!(small, 0);
+    }
     #[test]
     fn disc_freezes_on_pause_and_stop() {
         let mut m = Music::new();
