@@ -250,7 +250,7 @@ fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
     }
 }
 fn media_heights(inner: Rect, aspect: f64) -> u16 {
-    let available = inner.height.saturating_sub(20);
+    let available = inner.height.saturating_sub(22);
     let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
     if available >= 4 {
         desired.min(available)
@@ -307,7 +307,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(b, area);
     let cd_height = media_heights(inner, app.cell_aspect);
     let sections = Layout::vertical([
-        Constraint::Length(if cd_height > 0 { cd_height + 1 } else { 0 }),
+        Constraint::Length(if cd_height > 0 { cd_height + 3 } else { 0 }),
         Constraint::Min(1),
     ])
     .split(inner);
@@ -329,9 +329,9 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             f,
             Rect::new(
                 sections[0].x,
-                sections[0].y + 1,
+                sections[0].y + 2,
                 sections[0].width,
-                sections[0].height.saturating_sub(1),
+                sections[0].height.saturating_sub(3),
             ),
             music.spin_phase,
             app.cell_aspect,
