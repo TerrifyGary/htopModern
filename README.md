@@ -73,3 +73,5 @@ Weather scenes use a centered square viewport based on terminal pixel/cell dimen
 The weather illustration is compact (up to 36 columns and 14 rows), preserving the calibrated square aspect ratio.
 
 Native weather graphics: on startup the app detects iTerm2, Kitty, or Sixel support. Supported terminals receive 1024×1024 image frames, encoded on a background thread at up to four frames per second and fitted into the compact square panel. Other terminals retain the half-block fallback. The footer reports the detected graphics protocol. Native image display is constrained by the panel’s physical pixel size; increasing source resolution cannot increase the display’s pixel density.
+
+WEATHER shows relative humidity (%) and chance of precipitation for the current forecast hour (%), alongside Celsius temperature. Rain chance includes all precipitation types, using Open-Meteo’s hourly probability. Missing values and older cache entries show “unavailable” until the next successful refresh.

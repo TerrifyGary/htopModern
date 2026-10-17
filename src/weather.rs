@@ -20,6 +20,10 @@ pub struct Snapshot {
     pub query: String,
     pub location: String,
     pub temperature: f64,
+    #[serde(default)]
+    pub humidity: Option<f64>,
+    #[serde(default)]
+    pub rain_probability: Option<f64>,
     pub code: u32,
     pub wind: f64,
     pub day: bool,
@@ -70,6 +74,24 @@ fn json(url: &str) -> Result<serde_json::Value, String> {
     }
     serde_json::from_slice(&out.stdout).map_err(|_| "Invalid weather response".into())
 }
+fn percent(value: &serde_json::Value) -> Option<f64> {
+    value
+        .as_f64()
+        .filter(|v| v.is_finite() && (0.0..=100.0).contains(v))
+}
+fn hourly_probability(data: &serde_json::Value) -> Option<f64> {
+    let now = data["current"]["time"].as_i64()?;
+    let times = data["hourly"]["time"].as_array()?;
+    let index = times
+        .iter()
+        .position(|t| t.as_i64().is_some_and(|t| now >= t && now < t + 3600))?;
+    percent(&data["hourly"]["precipitation_probability"][index])
+}
+pub(crate) fn percent_label(value: Option<f64>) -> String {
+    value
+        .map(|v| format!("{v:.0}%"))
+        .unwrap_or_else(|| "unavailable".into())
+}
 pub fn fetch(query: &str) -> Result<Snapshot, String> {
     let geo = json(&format!(
         "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1&language=en&format=json",
@@ -81,7 +103,7 @@ pub fn fetch(query: &str) -> Result<Snapshot, String> {
         .ok_or("Location not found; try a city name")?;
     let lat = place["latitude"].as_f64().ok_or("Invalid latitude")?;
     let lon = place["longitude"].as_f64().ok_or("Invalid longitude")?;
-    let data=json(&format!("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code,wind_speed_10m,is_day&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto"))?;
+    let data=json(&format!("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,is_day&hourly=precipitation_probability&timeformat=unixtime&forecast_days=2&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto"))?;
     let c = &data["current"];
     let snapshot = Snapshot {
         query: query.into(),
@@ -91,6 +113,8 @@ pub fn fetch(query: &str) -> Result<Snapshot, String> {
             place["country"].as_str().unwrap_or("")
         ),
         temperature: c["temperature_2m"].as_f64().ok_or("Missing temperature")?,
+        humidity: percent(&c["relative_humidity_2m"]),
+        rain_probability: hourly_probability(&data),
         code: c["weather_code"]
             .as_u64()
             .ok_or("Missing weather condition")? as u32,
@@ -331,7 +355,12 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         })
         .unwrap_or_else(|| "Temperature: unavailable".into());
     let details = if let Some(snapshot) = snapshot {
-        format!("{}\n{info}", snapshot.location)
+        format!(
+            "{}\n{info}\nHumidity: {}\nRain chance (hour): {}",
+            snapshot.location,
+            percent_label(snapshot.humidity),
+            percent_label(snapshot.rain_probability)
+        )
     } else {
         info
     };
@@ -341,14 +370,14 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     );
     f.render_widget(
         Paragraph::new(details).wrap(Wrap { trim: false }),
-        Rect::new(inner.x, inner.y + 1, inner.width, 2.min(inner.height - 1)),
+        Rect::new(inner.x, inner.y + 1, inner.width, 4.min(inner.height - 1)),
     );
-    let available = inner.height.saturating_sub(6);
+    let available = inner.height.saturating_sub(8);
     let compact_width = (inner.width * 3 / 4).min(36);
     let art = square_viewport(
         Rect::new(
             inner.x + (inner.width - compact_width) / 2,
-            inner.y + 4.min(available),
+            inner.y + 6.min(available),
             compact_width,
             available.saturating_sub(1).min(14),
         ),
@@ -543,6 +572,18 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 mod tests {
     use super::*;
     #[test]
+    fn humidity_and_rain_handle_time_and_missing_data() {
+        let data = serde_json::json!({"current":{"time":5400},"hourly":{"time":[0,3600,7200],"precipitation_probability":[10,45,80]}});
+        assert_eq!(hourly_probability(&data), Some(45.));
+        assert_eq!(hourly_probability(&serde_json::json!({})), None);
+        assert_eq!(percent(&serde_json::json!(101)), None);
+        assert_eq!(percent_label(Some(0.)), "0%");
+        let old = serde_json::json!({"query":"Taipei","location":"Taipei","temperature":25,"code":0,"wind":0,"day":true,"fetched":0});
+        let snapshot: Snapshot = serde_json::from_value(old).unwrap();
+        assert_eq!(snapshot.humidity, None);
+        assert_eq!(snapshot.rain_probability, None);
+    }
+    #[test]
     fn square_viewport_uses_cell_dimensions() {
         for aspect in [1.5, 2.0, 2.4] {
             let area = Rect::new(5, 6, 40, 30);
@@ -563,6 +604,8 @@ mod tests {
                     query: "Taipei".into(),
                     location: "Taipei".into(),
                     temperature: 25.9,
+                    humidity: Some(72.),
+                    rain_probability: Some(40.),
                     code,
                     wind,
                     day,
@@ -599,6 +642,8 @@ mod tests {
             query: "Taipei".into(),
             location: "Taipei".into(),
             temperature: 25.,
+            humidity: None,
+            rain_probability: None,
             code: 0,
             wind: 0.,
             day: true,

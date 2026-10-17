@@ -455,11 +455,13 @@ fn main() -> io::Result<()> {
         let query = args.get(2).map(String::as_str).unwrap_or("Taipei");
         let snapshot = weather::fetch(query).map_err(io::Error::other)?;
         println!(
-            "{} · {} · {:.1}°C · {}",
+            "{} · {} · {:.1}°C · {} · Humidity: {} · Rain chance (hour): {}",
             snapshot.location,
             snapshot.condition(),
             snapshot.temperature,
-            if snapshot.day { "Day" } else { "Night" }
+            if snapshot.day { "Day" } else { "Night" },
+            weather::percent_label(snapshot.humidity),
+            weather::percent_label(snapshot.rain_probability)
         );
         return Ok(());
     }
