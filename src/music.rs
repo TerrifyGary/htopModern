@@ -390,7 +390,6 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     lines.push(Line::from("Apple Music · R refresh"));
     lines.push(Line::from(music.status.clone()));
     lines.push(Line::from(""));
-    lines.push(Line::from("L lyrics · ↑↓ scroll"));
     f.render_widget(
         Paragraph::new(lines).wrap(Wrap { trim: false }),
         sections[1],
