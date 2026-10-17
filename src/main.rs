@@ -247,7 +247,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
     let cpus = app.sys.cpus();
     let rows = cpus.len().div_ceil(cols);
     let mut lines = Vec::new();
-    for row in 0..rows.min(usize::from(inner.height).saturating_sub(5)) {
+    for row in 0..rows.min(usize::from(inner.height).saturating_sub(7)) {
         let mut text = String::new();
         for col in 0..cols {
             let i = col * rows + row;
@@ -261,6 +261,16 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
         }
         lines.push(Line::styled(text, Style::default().fg(GREEN)));
     }
+    let separator = || {
+        Line::styled(
+            "- ".repeat(usize::from(inner.width).div_ceil(2))
+                .chars()
+                .take(usize::from(inner.width))
+                .collect::<String>(),
+            Style::default().fg(Color::Rgb(107, 101, 86)),
+        )
+    };
+    lines.push(separator());
     let gb = 1_073_741_824.;
     lines.push(Line::from(format!(
         "Mem {:.1}/{:.1} GB   Swap {:.1}/{:.1} GB",
@@ -282,6 +292,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
         "Uptime {}   CPU temp: unavailable",
         uptime_label()
     )));
+    lines.push(separator());
     lines.push(Line::styled(
         "PROCESS                         CPU       MEMORY",
         Style::default().fg(AMBER),
@@ -364,7 +375,7 @@ fn ui(f: &mut Frame, app: &App) {
         .cpus()
         .len()
         .div_ceil((usize::from(area.width) / 27).max(1));
-    let top = (rows + 9).min(usize::from(area.height) / 2).max(6) as u16;
+    let top = (rows + 11).min(usize::from(area.height) / 2).max(6) as u16;
     let parts = Layout::vertical([
         Constraint::Length(top),
         Constraint::Length(1),
