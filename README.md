@@ -18,6 +18,8 @@ Turn your terminal into a calm workspace: keep an eye on your Mac, watch the fir
 
 > **macOS · Apple Silicon · Keyboard first** — launch with `htm`, switch panels with `Tab`, and quit with `Q`.
 
+![htopModern running in a terminal with the Beach scene, music controls, weather, and todos](docs/images/dashboard-beach.png)
+
 ## Install with Homebrew
 
 For Apple Silicon Macs with Homebrew installed:
@@ -114,11 +116,15 @@ cargo run --locked -- --music-check
 cargo run --locked -- --weather-check Taipei
 ```
 
-## A peek at the design
+## Pick your atmosphere
 
-![Original browser design prototype](docs/images/dashboard-preview.png)
+Real screenshots of the terminal app, showing three lo-fi scenes and theme combinations. Cycle scenes in LOFI and press `F2` to change the interface palette.
 
-The original browser prototype above guided the layout; the terminal app has since evolved. `cozy-terminal-preview.html` remains available as a design reference.
+| Beach · Amber | Coffee Shop · Forest | Fireplace · Mono |
+| :---: | :---: | :---: |
+| [![Beach scene with Amber theme](docs/images/dashboard-beach.png)](docs/images/dashboard-beach.png) | [![Coffee Shop scene with Forest theme](docs/images/dashboard-coffee-forest.png)](docs/images/dashboard-coffee-forest.png) | [![Fireplace scene with Mono theme](docs/images/dashboard-fireplace-mono.png)](docs/images/dashboard-fireplace-mono.png) |
+
+Click a screenshot to view it at full size. These captures show the half-block graphics fallback and cached weather readings; appearance varies with your terminal and font.
 
 ## Explore the code
 
