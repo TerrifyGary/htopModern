@@ -1,7 +1,7 @@
 use crate::{block, App, AMBER, CREAM, GREEN};
 use ratatui::{
-    layout::Rect,
-    style::Style,
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Style},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
     Frame,
@@ -21,6 +21,8 @@ pub struct Track {
     playing: bool,
     position: f64,
     duration: f64,
+    #[serde(default)]
+    lyrics: Option<String>,
 }
 #[derive(Deserialize)]
 pub struct Reply {
@@ -51,6 +53,14 @@ pub fn query(action: Action) -> Result<Reply, String> {
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Apple Music: {e}"))?;
+    let stdout = child.stdout.take().ok_or("Could not read Music output")?;
+    let reader = std::thread::spawn(move || {
+        let mut output = String::new();
+        stdout
+            .take(262144)
+            .read_to_string(&mut output)
+            .map(|_| output)
+    });
     let deadline = Instant::now() + Duration::from_secs(10);
     let status = loop {
         match child.try_wait() {
@@ -69,13 +79,10 @@ pub fn query(action: Action) -> Result<Reply, String> {
         }
         std::thread::sleep(Duration::from_millis(25));
     };
-    let mut output = String::new();
-    if let Some(stdout) = child.stdout.take() {
-        stdout
-            .take(65536)
-            .read_to_string(&mut output)
-            .map_err(|e| e.to_string())?;
-    }
+    let output = reader
+        .join()
+        .map_err(|_| "Music output reader failed")?
+        .map_err(|e| e.to_string())?;
     if !status.success() {
         return Err(
             "Music unavailable · allow terminal → Music in macOS Automation; R retries".into(),
@@ -98,6 +105,10 @@ pub struct Music {
     last: Instant,
     observed: Instant,
     failed: bool,
+    spin_phase: f64,
+    spin_updated: Instant,
+    pub lyrics_scroll: usize,
+    pub show_lyrics: bool,
 }
 impl Music {
     pub fn new() -> Self {
@@ -109,6 +120,10 @@ impl Music {
             last: Instant::now(),
             observed: Instant::now(),
             failed: false,
+            spin_phase: 0.,
+            spin_updated: Instant::now(),
+            lyrics_scroll: 0,
+            show_lyrics: true,
         }
     }
     pub fn request(&mut self, action: Action) {
@@ -122,9 +137,21 @@ impl Music {
             let _ = tx.send(query(action));
         });
     }
+    fn advance_spin(&mut self, seconds: f64) {
+        if self.track.as_ref().is_some_and(|t| t.playing) {
+            self.spin_phase = (self.spin_phase + seconds * 1.4) % std::f64::consts::TAU;
+        }
+    }
     fn apply(&mut self, result: Result<Reply, String>) {
+        self.advance_spin(self.spin_updated.elapsed().as_secs_f64());
+        self.spin_updated = Instant::now();
         match result {
             Ok(reply) => {
+                if self.track.as_ref().map(|t| (&t.title, &t.artist))
+                    != reply.track.as_ref().map(|t| (&t.title, &t.artist))
+                {
+                    self.lyrics_scroll = 0;
+                }
                 self.track = reply.track;
                 self.status = reply.status;
                 self.observed = Instant::now();
@@ -138,6 +165,8 @@ impl Music {
         }
     }
     pub fn tick(&mut self) {
+        self.advance_spin(self.spin_updated.elapsed().as_secs_f64());
+        self.spin_updated = Instant::now();
         let result = self.pending.as_ref().and_then(|rx| match rx.try_recv() {
             Ok(r) => Some(r),
             Err(mpsc::TryRecvError::Disconnected) => {
@@ -159,6 +188,19 @@ impl Music {
             1 => Action::Toggle,
             _ => Action::Next,
         });
+    }
+    pub fn scroll_lyrics(&mut self, down: bool) {
+        let max = self
+            .track
+            .as_ref()
+            .and_then(|t| t.lyrics.as_ref())
+            .map(|s| s.lines().count().saturating_sub(1))
+            .unwrap_or(0);
+        self.lyrics_scroll = if down {
+            (self.lyrics_scroll + 1).min(max)
+        } else {
+            self.lyrics_scroll.saturating_sub(1)
+        };
     }
     fn position(&self) -> f64 {
         self.track
@@ -187,11 +229,69 @@ fn clock(seconds: f64) -> String {
         format!("{}:{:02}", s / 60, s % 60)
     }
 }
+fn cd_color(x: f64, y: f64, angle: f64) -> Color {
+    let radius = x.hypot(y);
+    if !(0.12..=1.).contains(&radius) {
+        return crate::BG;
+    }
+    if radius < 0.31 {
+        return AMBER;
+    }
+    let phase = y.atan2(x) - angle;
+    let highlight = (phase * 2.).cos().max(0.).powi(12);
+    let ring = (radius * 110.).sin() * 5.;
+    let base = 145. + highlight * 75. + ring;
+    Color::Rgb(
+        base as u8,
+        (base + 7.).min(255.) as u8,
+        (base + 13.).min(255.) as u8,
+    )
+}
+fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
+    let h = area.height.min((area.width as f64 / aspect) as u16);
+    let w = (h as f64 * aspect).round().min(area.width as f64) as u16;
+    if h == 0 || w == 0 {
+        return;
+    }
+    let x0 = area.x + (area.width - w) / 2;
+    for row in 0..h {
+        for col in 0..w {
+            let x = (col as f64 + 0.5) / w as f64 * 2. - 1.;
+            let y = (row as f64 * 2. + 0.5) / (h as f64 * 2.) * 2. - 1.;
+            let bottom = (row as f64 * 2. + 1.5) / (h as f64 * 2.) * 2. - 1.;
+            f.buffer_mut()[(x0 + col, area.y + row)]
+                .set_symbol("▀")
+                .set_fg(cd_color(x, y, angle))
+                .set_bg(cd_color(x, bottom, angle));
+        }
+    }
+}
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let music = &app.music;
     let b = block(" MUSIC · M ", app.panel == 1);
     let inner = b.inner(area);
     f.render_widget(b, area);
+    let cd_height = if inner.height >= 24 {
+        8
+    } else if inner.height >= 17 {
+        4
+    } else {
+        0
+    };
+    let lyrics_height = if music.show_lyrics && inner.height >= 23 {
+        inner.height.saturating_sub(cd_height + 13).clamp(3, 8)
+    } else {
+        0
+    };
+    let sections = Layout::vertical([
+        Constraint::Length(cd_height),
+        Constraint::Min(1),
+        Constraint::Length(lyrics_height),
+    ])
+    .split(inner);
+    if cd_height > 0 {
+        disc(f, sections[0], music.spin_phase, app.cell_aspect);
+    }
     let playing = music.track.as_ref().is_some_and(|t| t.playing);
     let symbols = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     let time = app.started.elapsed().as_secs_f64();
@@ -247,12 +347,56 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     lines.push(Line::from("Apple Music · R refresh"));
     lines.push(Line::from(music.status.clone()));
     lines.push(Line::from(""));
-    lines.push(Line::from("YouTube / Firefox: pending"));
-    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), inner);
+    lines.push(Line::from("L lyrics · ↑↓ scroll"));
+    f.render_widget(
+        Paragraph::new(lines).wrap(Wrap { trim: false }),
+        sections[1],
+    );
+    if lyrics_height > 0 {
+        let lyrics = music
+            .track
+            .as_ref()
+            .and_then(|t| t.lyrics.as_deref())
+            .unwrap_or("Lyrics unavailable for this track");
+        let content = lyrics
+            .lines()
+            .skip(music.lyrics_scroll)
+            .collect::<Vec<_>>()
+            .join("\n");
+        f.render_widget(
+            Paragraph::new(content)
+                .block(block(" LYRICS · ↑↓ ", false))
+                .wrap(Wrap { trim: false }),
+            sections[2],
+        );
+    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn disc_freezes_on_pause_and_stop() {
+        let mut m = Music::new();
+        m.track = Some(Track {
+            title: "Track".into(),
+            artist: "Artist".into(),
+            playing: true,
+            position: 0.,
+            duration: 100.,
+            lyrics: Some("one\ntwo\nthree".into()),
+        });
+        m.advance_spin(1.);
+        let spinning = m.spin_phase;
+        assert!(spinning > 0.);
+        m.track.as_mut().unwrap().playing = false;
+        m.advance_spin(5.);
+        assert_eq!(m.spin_phase, spinning);
+        m.scroll_lyrics(true);
+        assert_eq!(m.lyrics_scroll, 1);
+        m.track = None;
+        m.advance_spin(5.);
+        assert_eq!(m.spin_phase, spinning);
+    }
     #[test]
     fn timing_and_error_state() {
         assert_eq!(clock(102.), "1:42");
@@ -265,6 +409,7 @@ mod tests {
                 playing: false,
                 position: 42.,
                 duration: 100.,
+                lyrics: None,
             }),
             status: "Paused".into(),
         }));

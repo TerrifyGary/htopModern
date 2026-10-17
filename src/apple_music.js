@@ -13,9 +13,12 @@ function run(argv) {
         return JSON.stringify({track: null, status: 'Choose a track in Apple Music'});
     }
     const track = music.currentTrack();
+    let lyrics = null;
+    try { const text = track.lyrics(); if (text && text.trim()) lyrics = text.substring(0, 12000); } catch (_) {}
+
     return JSON.stringify({track: {
         title: track.name(), artist: track.artist(),
         playing: state === 'playing', position: music.playerPosition(),
-        duration: track.duration()
+        duration: track.duration(), lyrics: lyrics
     }, status: state === 'playing' ? 'Playing' : 'Paused'});
 }

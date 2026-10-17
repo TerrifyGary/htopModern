@@ -85,3 +85,7 @@ macOS may ask for permission for your terminal to control Music. If denied, enab
 YouTube in Firefox requires a separate browser bridge and is not supported in this milestone. No browser settings or extensions are changed automatically.
 
 `cargo run --locked -- --music-check` performs a read-only Apple Music connection check.
+
+The MUSIC panel includes a CD above the track information. It rotates while playback is reported as playing and holds its angle when paused or stopped (external changes are detected on the next two-second poll). Small panels hide the CD to preserve playback controls.
+
+Press `L` while MUSIC is focused to show/hide lyrics; Up/Down scrolls them. Lyrics come from the current track’s Music scripting field, when provided, and are limited to the first 12,000 characters. This is plain text, not synchronized Apple Music catalog lyrics. An unavailable message is shown when Music exposes no lyrics. The lyrics area appears only when the panel has enough height.
