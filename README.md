@@ -4,7 +4,7 @@ A cozy, vintage-inspired macOS terminal dashboard combining htop-style system mo
 
 ## Status
 
-The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a flip-style digital clock are also implemented. Live weather with Celsius temperature, editable location, automatic day/night, and animated weather scenes are implemented. CPU temperature and music integration remain pending in the terminal app. The browser prototype remains the visual reference.
+The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a flip-style digital clock are also implemented. Live weather with Celsius temperature, editable location, automatic day/night, and animated weather scenes are implemented. Apple Music playback info and controls are implemented. CPU temperature and Firefox/YouTube integration remain pending. The browser prototype remains the visual reference.
 
 ## Run the terminal app
 
@@ -75,3 +75,13 @@ The weather illustration is compact (up to 36 columns and 14 rows), preserving t
 Native weather graphics: on startup the app detects iTerm2, Kitty, or Sixel support. Supported terminals receive 1024×1024 image frames, encoded on a background thread at up to four frames per second and fitted into the compact square panel. Other terminals retain the half-block fallback. The footer reports the detected graphics protocol. Native image display is constrained by the panel’s physical pixel size; increasing source resolution cannot increase the display’s pixel density.
 
 WEATHER shows relative humidity (%) and chance of precipitation for the current forecast hour (%), alongside Celsius temperature. Rain chance includes all precipitation types, using Open-Meteo’s hourly probability. Missing values and older cache entries show “unavailable” until the next successful refresh.
+
+## Music
+
+MUSIC reads the Apple Music app’s current title, artist, playback position, duration, and playing/paused state. Left/Right selects Previous, Play/Pause, or Next; Enter activates the selected control. `R` retries a failed connection. Polling and commands run in background workers; the bars are decorative playback indicators, not an audio spectrum. The app does not launch Music automatically.
+
+macOS may ask for permission for your terminal to control Music. If denied, enable that terminal’s access to Music in System Settings → Privacy & Security → Automation, then press `R`. The panel shows a connection error instead of retaining stale playback information.
+
+YouTube in Firefox requires a separate browser bridge and is not supported in this milestone. No browser settings or extensions are changed automatically.
+
+`cargo run --locked -- --music-check` performs a read-only Apple Music connection check.

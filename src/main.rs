@@ -1,5 +1,6 @@
 mod graphics;
 mod lofi;
+mod music;
 mod weather;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -71,12 +72,14 @@ struct App {
     aspect_override: Option<f64>,
     graphics: std::cell::RefCell<graphics::Graphics>,
     weather: weather::Weather,
+    music: music::Music,
 }
 impl App {
     fn new(path: PathBuf) -> io::Result<Self> {
         let tasks = load_tasks(&path)?;
         let mut app = Self {
             weather: weather::Weather::new(path.with_file_name("weather.json")),
+            music: music::Music::new(),
             sys: System::new(),
             tasks,
             path,
@@ -185,6 +188,12 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => return true,
+            KeyCode::Left if self.panel == 1 => self.music.selected = (self.music.selected + 2) % 3,
+            KeyCode::Right if self.panel == 1 => {
+                self.music.selected = (self.music.selected + 1) % 3
+            }
+            KeyCode::Enter if self.panel == 1 => self.music.activate(),
+            KeyCode::Char('r') if self.panel == 1 => self.music.request(music::Action::Read),
             KeyCode::Enter | KeyCode::Char('e') if self.panel == 3 => {
                 self.weather.input = Some(self.weather.query.clone())
             }
@@ -384,8 +393,6 @@ fn ui(f: &mut Frame, app: &App) {
     ])
     .split(area);
     computer(f, parts[0], app);
-    let names = [" LOFI · L ", " MUSIC · M ", " TODO · T ", " WEATHER · W "];
-    let placeholder=["Fireplace · Beach · Coffee Shop\n\nAnimated scenes and clock\ncoming in the next milestone.","Player not connected yet.\n\nPrevious / Play / Next\ncoming in a later milestone.","","Taipei\n\nLive weather and character\ncoming in a later milestone."];
     if area.width >= 110 {
         let panels = Layout::horizontal([Constraint::Percentage(25); 4]).split(parts[2]);
         for i in 0..4 {
@@ -396,12 +403,7 @@ fn ui(f: &mut Frame, app: &App) {
             } else if i == 2 {
                 todos(f, panels[i], app);
             } else {
-                f.render_widget(
-                    Paragraph::new(placeholder[i])
-                        .block(block(names[i], app.panel == i))
-                        .wrap(Wrap { trim: false }),
-                    panels[i],
-                );
+                music::draw(f, panels[i], app);
             }
         }
     } else if app.panel == 0 {
@@ -411,13 +413,9 @@ fn ui(f: &mut Frame, app: &App) {
     } else if app.panel == 2 {
         todos(f, parts[2], app);
     } else {
-        f.render_widget(
-            Paragraph::new(placeholder[app.panel])
-                .block(block(names[app.panel], true))
-                .wrap(Wrap { trim: false }),
-            parts[2],
-        );
+        music::draw(f, parts[2], app);
     }
+
     let status = if app.prefix {
         "Choose L / M / T / W"
     } else {
@@ -462,6 +460,11 @@ fn cell_aspect() -> f64 {
 }
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
+    if args.get(1).is_some_and(|a| a == "--music-check") {
+        let reply = music::query(music::Action::Read).map_err(io::Error::other)?;
+        println!("{}", reply.status);
+        return Ok(());
+    }
     if args.get(1).is_some_and(|a| a == "--weather-check") {
         let query = args.get(2).map(String::as_str).unwrap_or("Taipei");
         let snapshot = weather::fetch(query).map_err(io::Error::other)?;
@@ -513,12 +516,14 @@ fn main() -> io::Result<()> {
         app.aspect_override = Some(ratio);
     }
     app.weather.request();
+    app.music.request(music::Action::Read);
     let mut terminal = ratatui::init();
     app.message = app.graphics.borrow_mut().detect();
     let result = (|| {
         let mut refreshed = Instant::now();
         loop {
             app.weather.tick();
+            app.music.tick();
             terminal.draw(|f| ui(f, &app))?;
             if event::poll(Duration::from_millis(100))? {
                 let event = event::read()?;
