@@ -267,7 +267,7 @@ fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
     }
 }
 fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
-    // Give the disc the panel's full width, just as the LOFI scene does.
+    // Render the disc at 70% of the previous full-width diameter.
     // Reserve track details and controls before allocating artwork or lyrics.
     let minimum_lyrics = if show_lyrics && inner.height >= 23 {
         3
@@ -275,7 +275,7 @@ fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
         0
     };
     let available = inner.height.saturating_sub(13 + minimum_lyrics);
-    let desired = (inner.width as f64 / aspect).floor() as u16;
+    let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
     let cd = if available >= 4 {
         desired.min(available)
     } else {
@@ -386,9 +386,9 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 mod tests {
     use super::*;
     #[test]
-    fn cd_uses_full_panel_width_when_space_allows() {
+    fn cd_uses_seventy_percent_of_full_width() {
         let (cd, lyrics) = media_heights(Rect::new(0, 0, 46, 44), 2.3, true);
-        assert_eq!(cd, 20);
+        assert_eq!(cd, 14);
         assert!(lyrics >= 3);
         assert!(cd + lyrics + 13 <= 44);
         let (small, _) = media_heights(Rect::new(0, 0, 25, 8), 2.3, true);
