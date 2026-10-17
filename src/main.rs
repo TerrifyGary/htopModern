@@ -1,3 +1,8 @@
+//! Terminal setup, keyboard routing, persistent todos, and dashboard composition.
+//!
+//! Panel-specific rendering and integrations live in sibling modules. The event
+//! loop polls their background results so input and animation remain responsive.
+
 mod computer;
 mod graphics;
 mod lofi;

@@ -1,3 +1,7 @@
+//! Procedural Fireplace, Beach, and Coffee Shop scenes with a device-time clock.
+//!
+//! Scenes share the media layout baseline with Music and Weather.
+
 use crate::{block, App, AMBER, CREAM};
 use chrono::{Local, Timelike};
 use ratatui::{

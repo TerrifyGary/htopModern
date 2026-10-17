@@ -1,3 +1,8 @@
+//! Saved theme and terminal cell proportions.
+//!
+//! Missing or unreadable settings fall back to defaults. Saves use a temporary
+//! file and rename so an interrupted write does not partially replace the file.
+
 use serde::{Deserialize, Serialize};
 use std::{fs, io, path::Path};
 #[derive(Default, Serialize, Deserialize)]
@@ -14,6 +19,7 @@ impl Settings {
             .and_then(|s| serde_json::from_slice(&s).ok())
             .unwrap_or_default()
     }
+    /// Persist settings by writing a sibling temporary file and renaming it.
     pub fn save(&self, path: &Path) -> io::Result<()> {
         if let Some(p) = path.parent() {
             fs::create_dir_all(p)?;

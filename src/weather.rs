@@ -1,3 +1,8 @@
+//! Open-Meteo forecasts, local caching, and animated weather landscapes.
+//!
+//! Network requests run off the UI thread. The renderer chooses native terminal
+//! images when available and falls back to colored half-blocks.
+
 use crate::{block, App, AMBER};
 use chrono::{Local, Timelike, Utc};
 use ratatui::{
@@ -92,6 +97,7 @@ pub(crate) fn percent_label(value: Option<f64>) -> String {
         .map(|v| format!("{v:.0}%"))
         .unwrap_or_else(|| "unavailable".into())
 }
+/// Resolve the first matching city and fetch its current weather and hourly forecast.
 pub fn fetch(query: &str) -> Result<Snapshot, String> {
     let geo = json(&format!(
         "https://geocoding-api.open-meteo.com/v1/search?name={}&count=1&language=en&format=json",

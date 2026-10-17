@@ -1,3 +1,7 @@
+//! Five named palettes applied to the finished terminal buffer.
+//!
+//! Only semantic interface colors are remapped; animation artwork keeps its colors.
+
 use crate::{AMBER, BG, CREAM, GREEN};
 use ratatui::{buffer::Buffer, style::Color};
 pub const NAMES: [&str; 5] = ["amber", "forest", "ocean", "rose", "mono"];

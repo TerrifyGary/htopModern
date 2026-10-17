@@ -1,3 +1,7 @@
+//! Computer panel: per-core meters, system details, and the top three processes.
+//!
+//! Process CPU usage can exceed 100% when a process uses multiple cores.
+
 use crate::{block, meter, App, AMBER, CREAM, GREEN};
 use ratatui::{
     layout::{Constraint, Layout, Rect},

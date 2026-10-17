@@ -1,6 +1,22 @@
+<div align="center">
+
 # htopModern
 
-A cozy macOS terminal dashboard: live computer monitoring, animated lo-fi scenes, Apple Music controls, weather, and a persistent todo list.
+**A little focus. A little music. A cozier terminal.**
+
+Live Mac monitoring · Lo-fi scenes · Apple Music · Weather · Todos
+
+[![Release](https://img.shields.io/github/v/release/TerrifyGary/htopModern?color=cda76d)](https://github.com/TerrifyGary/htopModern/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-a5b979.svg)](LICENSE)
+[![Homebrew installation](https://github.com/TerrifyGary/homebrew-tap/actions/workflows/test.yml/badge.svg)](https://github.com/TerrifyGary/homebrew-tap/actions/workflows/test.yml)
+
+[Get started](#install-with-homebrew) · [Controls](#keyboard-controls) · [Build it yourself](#build-and-check-from-source) · [Code guide](docs/DEVELOPMENT.md)
+
+</div>
+
+Turn your terminal into a calm workspace: keep an eye on your Mac, watch the fireplace, control your music, and jot down your next task.
+
+> **macOS · Apple Silicon · Keyboard first** — launch with `htm`, switch panels with `Tab`, and quit with `Q`.
 
 ## Install with Homebrew
 
@@ -22,12 +38,16 @@ Uninstalling keeps your personal tasks, settings, and weather cache. Release 0.1
 
 ## Features
 
-- **COMPUTER:** per-core CPU meters; system/hardware details; memory, swap, load and uptime; CPU/GPU temperature and power through `macmon`; top three processes with highlighted PID, name, CPU, and memory. Process CPU can exceed 100% across multiple cores. No kill controls.
-- **LOFI:** animated Fireplace, Beach, and Coffee Shop scenes plus a flip-style clock using device time.
-- **MUSIC:** Apple Music track info, spinning CD, decorative equalizer, moving progress dot, and Previous/Play-Pause/Next controls. Playback controls run independently of metadata polling.
-- **WEATHER:** editable location defaulting to Taipei, Celsius temperature, humidity, hourly precipitation probability, automatic daylight selection, and a compact animated landscape. Refreshes every ten minutes and labels cached/offline readings.
-- **TODO:** add, complete, and delete tasks, saved locally.
-- **THEMES:** Amber, Forest, Ocean, Rose, and Mono, with saved preferences.
+| Panel | Make yourself at home |
+| --- | --- |
+| **COMPUTER** | Per-core CPU meters, memory, swap, uptime, hardware details, and highlighted top-three processes. CPU/GPU temperature and power through `macmon`. |
+| **LOFI** | Animated **Fireplace**, **Beach**, and **Coffee Shop** scenes, paired with a flip-style digital clock. |
+| **MUSIC** | Apple Music controls, track details, a spinning CD that pauses with your music, a decorative equalizer, and a moving progress dot. |
+| **WEATHER** | Your city’s temperature in °C, humidity, hourly precipitation probability, and a landscape that follows the weather and daylight. Taipei is the default. |
+| **TODO** | Add, complete, and delete tasks. Your list stays saved between sessions. |
+| **THEMES** | **Amber · Forest · Ocean · Rose · Mono** — switch with `F2` and keep your preference. |
+
+Process CPU can exceed 100% across multiple cores. The computer panel has no kill controls. Music controls run independently of metadata polling. Weather refreshes every ten minutes and labels cached/offline readings.
 
 Panels are ordered LOFI → MUSIC → WEATHER → TODO. MUSIC is focused at startup. Wide terminals show all four; narrow terminals show the selected panel. Animation/info dividers align across panels.
 
@@ -94,11 +114,15 @@ cargo run --locked -- --music-check
 cargo run --locked -- --weather-check Taipei
 ```
 
-## Design reference
+## A peek at the design
 
 ![Original browser design prototype](docs/images/dashboard-preview.png)
 
 The original browser prototype above guided the layout; the terminal app has since evolved. `cozy-terminal-preview.html` remains available as a design reference.
+
+## Explore the code
+
+New to the project? Start with the [developer guide](docs/DEVELOPMENT.md) for a module map, background-worker design, and release workflow. Rust source files include Markdown documentation comments; run `cargo doc --no-deps --document-private-items --open` to browse them locally.
 
 ## License
 

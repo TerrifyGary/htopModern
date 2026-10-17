@@ -1,3 +1,8 @@
+//! Background encoding for native terminal weather images.
+//!
+//! At most one encoding job is pending. Completed frames are reused between
+//! updates, while resizing invalidates frames encoded for the previous area.
+
 use image::{DynamicImage, RgbImage};
 use ratatui::{layout::Rect, Frame};
 use ratatui_image::{
@@ -38,6 +43,7 @@ impl Graphics {
     pub fn native(&self) -> bool {
         self.picker.is_some()
     }
+    /// Poll completed encoding work and report whether another frame can be submitted.
     pub fn ready(&mut self, area: Rect) -> bool {
         if let Some(rx) = &self.pending {
             if let Ok(result) = rx.try_recv() {
@@ -54,6 +60,7 @@ impl Graphics {
         self.pending.is_none()
             && (self.protocol.is_none() || self.last.elapsed() >= Duration::from_millis(250))
     }
+    /// Encode a frame on a worker, keeping terminal input responsive.
     pub fn submit(&mut self, image: RgbImage, area: Rect) {
         let Some(picker) = self.picker.clone() else {
             return;

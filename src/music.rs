@@ -1,3 +1,10 @@
+//! Apple Music integration and the Music panel.
+//!
+//! # Responsiveness
+//! Metadata reads and playback commands use separate workers. Commands are queued
+//! in order; an epoch counter prevents older reads from replacing newer state.
+//! The equalizer is decorative rather than a measurement of audio output.
+
 use crate::{block, App, AMBER, CREAM, GREEN};
 use ratatui::{
     layout::Rect,
@@ -145,6 +152,7 @@ impl Music {
             spin_updated: Instant::now(),
         }
     }
+    /// Queue a playback action or start a metadata read if none is pending.
     pub fn request(&mut self, action: Action) {
         if !matches!(action, Action::Read) {
             self.commands.push_back(action);
@@ -258,6 +266,7 @@ impl Music {
             _ => Action::Next,
         });
     }
+    /// Estimate playback progress between metadata polls, stopping when paused.
     fn position(&self) -> f64 {
         self.track
             .as_ref()

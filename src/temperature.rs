@@ -1,3 +1,8 @@
+//! Optional, password-free Apple Silicon sensor readings through `macmon`.
+//!
+//! Sampling runs on a worker every five seconds. Each helper process has a
+//! timeout, and unsupported or invalid temperatures remain unavailable.
+
 use std::{
     io::Read,
     path::PathBuf,
@@ -47,6 +52,7 @@ fn executable() -> Option<PathBuf> {
     }
     paths.into_iter().find(|p| p.is_file())
 }
+/// Read one `macmon` sample, terminating the helper after a five-second timeout.
 pub fn sample() -> Result<Reading, String> {
     let path = executable().ok_or("Install macmon for temperature (no sudo)")?;
     let mut child = Command::new(path)

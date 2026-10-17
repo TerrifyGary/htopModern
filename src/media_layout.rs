@@ -1,3 +1,7 @@
+//! Shared animation and information regions for LOFI, Music, and Weather.
+//!
+//! Centralizing these rectangles keeps dashed dividers and text baselines aligned.
+
 use ratatui::{
     layout::Rect,
     style::{Color, Style},
@@ -6,6 +10,7 @@ use ratatui::{
     Frame,
 };
 
+/// Return the animation region and the information region below it.
 pub fn regions(inner: Rect) -> (Rect, Rect) {
     let visual_height = if inner.height >= 20 {
         inner.height - 12
@@ -26,6 +31,7 @@ pub fn regions(inner: Rect) -> (Rect, Rect) {
     );
     (content, info)
 }
+/// Build a dashed separator clipped to the available terminal columns.
 pub fn divider(width: u16) -> Line<'static> {
     Line::styled(
         "- ".repeat(usize::from(width).div_ceil(2))
@@ -35,6 +41,7 @@ pub fn divider(width: u16) -> Line<'static> {
         Style::default().fg(Color::Rgb(107, 101, 86)),
     )
 }
+/// Draw shared separators and return the regions available to panel content.
 pub fn frame(f: &mut Frame, inner: Rect) -> (Rect, Rect) {
     let (content, info) = regions(inner);
     if inner.height > 0 {
