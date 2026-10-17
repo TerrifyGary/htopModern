@@ -1,5 +1,6 @@
 mod graphics;
 mod lofi;
+mod media_layout;
 mod music;
 mod weather;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -614,6 +615,25 @@ mod tests {
         }
         assert_ne!(outputs[0], outputs[1]);
         assert_ne!(outputs[1], outputs[2]);
+    }
+    #[test]
+    fn media_titles_align_across_columns() {
+        let app = App::new(env::temp_dir().join("htopmodern-alignment/todos.json")).unwrap();
+        let mut term = ratatui::Terminal::new(ratatui::backend::TestBackend::new(180, 52)).unwrap();
+        term.draw(|f| ui(f, &app)).unwrap();
+        let buffer = term.backend().buffer();
+        let find = |needle: &str| {
+            (0..52)
+                .find(|&y| {
+                    let row = (0..180)
+                        .map(|x| buffer[(x, y)].symbol())
+                        .collect::<String>();
+                    row.contains(needle)
+                })
+                .unwrap()
+        };
+        assert_eq!(find("Fireplace"), find("No active track"));
+        assert_eq!(find("Fireplace"), find("[Location: Taipei]"));
     }
     #[test]
     fn small_terminal_renders() {

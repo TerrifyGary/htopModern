@@ -1,6 +1,6 @@
 use crate::{block, App, AMBER, CREAM, GREEN};
 use ratatui::{
-    layout::{Constraint, Layout, Rect},
+    layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Paragraph, Wrap},
@@ -305,40 +305,33 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let b = block(" MUSIC · M ", app.panel == 1);
     let inner = b.inner(area);
     f.render_widget(b, area);
-    let cd_height = media_heights(inner, app.cell_aspect);
-    let sections = Layout::vertical([
-        Constraint::Length(if cd_height > 0 { cd_height + 3 } else { 0 }),
-        Constraint::Min(1),
-    ])
-    .split(inner);
-    let divider = || {
-        Line::styled(
-            "- ".repeat(usize::from(inner.width).div_ceil(2))
-                .chars()
-                .take(usize::from(inner.width))
-                .collect::<String>(),
-            Style::default().fg(Color::Rgb(107, 101, 86)),
-        )
-    };
+    let (visual, info) = crate::media_layout::frame(f, inner);
+    let bar_rows = if visual.height >= 9 { 4 } else { 1 };
+    let equalizer_height = (bar_rows + 2).min(usize::from(visual.height)) as u16;
+    let cd_space = visual.height.saturating_sub(equalizer_height + 1);
+    let cd_height = media_heights(inner, app.cell_aspect).min(cd_space);
     if cd_height > 0 {
-        f.render_widget(
-            Paragraph::new(divider()),
-            Rect::new(sections[0].x, sections[0].y, sections[0].width, 1),
-        );
         disc(
             f,
             Rect::new(
-                sections[0].x,
-                sections[0].y + 2,
-                sections[0].width,
-                sections[0].height.saturating_sub(3),
+                visual.x,
+                visual.y + (cd_space - cd_height) / 2,
+                visual.width,
+                cd_height,
             ),
             music.spin_phase,
             app.cell_aspect,
         );
     }
+    let bars_y = visual.y + visual.height.saturating_sub(equalizer_height);
+    if cd_space > 0 {
+        f.render_widget(
+            Paragraph::new(crate::media_layout::divider(inner.width)),
+            Rect::new(visual.x, bars_y.saturating_sub(1), visual.width, 1),
+        );
+    }
     let playing = music.track.as_ref().is_some_and(|t| t.playing);
-    let bar_rows = if sections[1].height >= 12 { 4 } else { 1 };
+
     let mut lines = equalizer_lines(
         inner.width,
         bar_rows,
@@ -354,14 +347,12 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         ][music.equalizer_color],
     );
     lines.insert(0, Line::from(""));
-    if cd_height > 0 {
-        lines.insert(0, divider());
-    }
     lines.push(Line::from(""));
-    lines.push(divider());
-    // Keep the player group balanced in the remaining space.
-    let gap = usize::from(sections[1].height).saturating_sub(lines.len() + 9) / 2;
-    lines.extend((0..gap + 1).map(|_| Line::from("")));
+    f.render_widget(
+        Paragraph::new(lines),
+        Rect::new(visual.x, bars_y, visual.width, equalizer_height),
+    );
+    let mut lines = vec![Line::from("")];
     if let Some(track) = &music.track {
         lines.push(
             Line::styled(
@@ -422,10 +413,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         lines.push(Line::from(""));
         lines.push(Line::from(music.status.clone()).centered());
     }
-    f.render_widget(
-        Paragraph::new(lines).wrap(Wrap { trim: false }),
-        sections[1],
-    );
+    f.render_widget(Paragraph::new(lines).wrap(Wrap { trim: false }), info);
 }
 #[cfg(test)]
 mod tests {

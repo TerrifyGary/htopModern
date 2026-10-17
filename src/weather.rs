@@ -364,25 +364,42 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     } else {
         info
     };
-    f.render_widget(
-        Paragraph::new(title).style(Style::default().fg(AMBER)),
-        Rect::new(inner.x, inner.y, inner.width, 1),
-    );
-    f.render_widget(
-        Paragraph::new(details).wrap(Wrap { trim: false }),
-        Rect::new(inner.x, inner.y + 1, inner.width, 4.min(inner.height - 1)),
-    );
-    let available = inner.height.saturating_sub(8);
-    let compact_width = (inner.width * 3 / 4).min(36);
+    let (visual, info_area) = crate::media_layout::frame(f, inner);
+    let compact_width = (visual.width * 3 / 4).min(36);
+    let height = visual.height.min(14);
     let art = square_viewport(
         Rect::new(
-            inner.x + (inner.width - compact_width) / 2,
-            inner.y + 6.min(available),
+            visual.x + (visual.width - compact_width) / 2,
+            visual.y + (visual.height - height) / 2,
             compact_width,
-            available.saturating_sub(1).min(14),
+            height,
         ),
         app.cell_aspect,
     );
+    f.render_widget(
+        Paragraph::new(title)
+            .centered()
+            .style(Style::default().fg(AMBER)),
+        Rect::new(
+            info_area.x,
+            info_area.y + info_area.height.min(1),
+            info_area.width,
+            1.min(info_area.height.saturating_sub(1)),
+        ),
+    );
+    if info_area.height > 2 {
+        f.render_widget(
+            Paragraph::new(details)
+                .centered()
+                .wrap(Wrap { trim: false }),
+            Rect::new(
+                info_area.x,
+                info_area.y + 2,
+                info_area.width,
+                4.min(info_area.height - 2),
+            ),
+        );
+    }
     let h = art.height;
     let t = app.started.elapsed().as_secs_f64();
     let mut graphics = app.graphics.borrow_mut();
@@ -549,7 +566,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         graphics.render(f, art);
     }
 
-    let bottom = inner.y + inner.height.saturating_sub(3);
+    let bottom = info_area.y + info_area.height.saturating_sub(3);
     let age = snapshot
         .map(|s| {
             format!(
@@ -564,8 +581,15 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         "Enter/E location · R refresh"
     };
     f.render_widget(
-        Paragraph::new(format!("{}{age}\n{hint}", weather.status)).wrap(Wrap { trim: false }),
-        Rect::new(inner.x, bottom, inner.width, 3.min(inner.height)),
+        Paragraph::new(format!("{}{age}\n{hint}", weather.status))
+            .centered()
+            .wrap(Wrap { trim: false }),
+        Rect::new(
+            info_area.x,
+            bottom,
+            info_area.width,
+            3.min(info_area.height),
+        ),
     );
 }
 #[cfg(test)]

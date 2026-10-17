@@ -33,24 +33,24 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         f.render_widget(Paragraph::new(NAMES[app.scene]), inner);
         return;
     }
-    let clock_height = if inner.height >= 12 && inner.width >= 23 {
+    let (visual, info) = crate::media_layout::frame(f, inner);
+    let clock_height = if info.height >= 12 && inner.width >= 23 {
         8
     } else {
         1
     };
-    let available = inner.height.saturating_sub(clock_height + 3);
-    let scene_area = square_area(Rect::new(inner.x, inner.y, inner.width, available));
+    let scene_area = square_area(visual);
     let control_area = Rect::new(
-        inner.x,
-        inner.y + available,
-        inner.width,
-        3.min(inner.height),
+        info.x,
+        info.y + info.height.min(1),
+        info.width,
+        3.min(info.height.saturating_sub(1)),
     );
     let clock_area = Rect::new(
-        inner.x,
+        info.x,
         control_area.y + control_area.height,
-        inner.width,
-        clock_height,
+        info.width,
+        clock_height.min(info.height.saturating_sub(control_area.height + 1)),
     );
     let time = app.started.elapsed().as_secs_f64();
     let canvas = Canvas::default()
@@ -308,9 +308,10 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 format!("{} · {}", NAMES[app.scene], Local::now().format("%H:%M"))
             } else {
                 NAMES[app.scene].to_string()
-            }),
-            controls,
-            Line::from("←→ select · Enter switch"),
+            })
+            .centered(),
+            controls.centered(),
+            Line::from("←→ select · Enter switch").centered(),
         ]),
         control_area,
     );
