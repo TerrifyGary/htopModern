@@ -274,7 +274,7 @@ fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
     } else {
         0
     };
-    let available = inner.height.saturating_sub(16 + minimum_lyrics);
+    let available = inner.height.saturating_sub(17 + minimum_lyrics);
     let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
     let cd = if available >= 4 {
         desired.min(available)
@@ -282,7 +282,7 @@ fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
         0
     };
     let lyrics = if minimum_lyrics > 0 {
-        inner.height.saturating_sub(cd + 16).min(8)
+        inner.height.saturating_sub(cd + 17).min(8)
     } else {
         0
     };
@@ -330,6 +330,17 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let time = app.started.elapsed().as_secs_f64();
     let bar_rows = if sections[1].height >= 12 { 4 } else { 1 };
     let mut lines = equalizer_lines(inner.width, bar_rows, playing, time);
+    if cd_height > 0 {
+        let divider = "- "
+            .repeat(usize::from(inner.width).div_ceil(2))
+            .chars()
+            .take(usize::from(inner.width))
+            .collect::<String>();
+        lines.insert(
+            0,
+            Line::styled(divider, Style::default().fg(Color::Rgb(107, 101, 86))),
+        );
+    }
     // Exactly one blank row separates the equalizer and track information.
     lines.push(Line::from(""));
     if let Some(track) = &music.track {
