@@ -4,7 +4,7 @@ A cozy, vintage-inspired macOS terminal dashboard combining htop-style system mo
 
 ## Status
 
-The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a flip-style digital clock are also implemented. Live weather with Celsius temperature, editable location, automatic day/night, and animated weather scenes are implemented. Apple Music playback info and controls are implemented. CPU temperature and Firefox/YouTube integration remain pending. The browser prototype remains the visual reference.
+The first Rust terminal milestone is implemented: full-screen responsive layout, real CPU/memory/process readings, uptime, and persistent todos. Generated LOFI animations (Fireplace, Beach, Coffee Shop) and a flip-style digital clock are also implemented. Live weather with Celsius temperature, editable location, automatic day/night, and animated weather scenes are implemented. Apple Music playback info and controls are implemented. CPU/GPU temperatures are supported through the optional no-sudo macmon helper. Firefox/YouTube integration remains pending. The browser prototype remains the visual reference.
 
 ## Run the terminal app
 
@@ -42,7 +42,7 @@ Open `cozy-terminal-preview.html` in a browser. LOFI scenes and the analog clock
 
 ## Agreed design
 
-- **COMPUTER:** individual CPU meters, memory and swap, task/thread counts, load averages, uptime, CPU temperature where supported, and a simplified process table in the same box. No PID or kill controls.
+- **COMPUTER:** individual CPU meters, memory and swap, task/thread counts, load averages, uptime, CPU temperature where supported, and a split system/hardware + top-three process view. The busiest processes show PID, name, CPU, and memory. No kill controls.
 - **LOFI · L:** generated animated Fireplace, Beach, and Coffee Shop scenes; previous/next scene buttons; flip-style digital clock using device time. No GIF dependency.
 - **MUSIC · M:** animated music bars, track and artist, playback timing on its own line, and selectable previous/play-pause/next buttons.
 - **TODO · T:** an Add item button with task entry, selectable checkboxes and trash buttons, with persistent local storage planned.
@@ -96,3 +96,32 @@ MUSIC is focused on startup. Panels are ordered LOFI → MUSIC → WEATHER → T
 LOFI, MUSIC, and WEATHER share a common animation/info boundary: their dashed separators and first information rows align. WEATHER places the animation above centered location and readings.
 
 Playback controls use a separate fast AppleScript path and a serialized command queue, so metadata polling does not discard button presses. Older poll results are ignored after a command, and playback state is refreshed about every 750 ms. Apple Music streaming/buffering and macOS automation can still add latency.
+
+## Short command and themes
+
+After `cargo install --path . --locked`, run `htopmodern` directly. On this development Mac, `htm` is also installed as a short launcher. To create the same shortcut elsewhere:
+
+```sh
+ln -s htopmodern ~/.cargo/bin/htm
+htm
+```
+
+A shell alias is another option: `alias htm='htopmodern'`. A launcher/symlink works across shells without editing shell startup files.
+
+Press **F2** to cycle **Vintage Amber**, **Forest**, **Ocean**, **Rose**, and **Mono**. Or launch with `htm --theme ocean`. Themes and an explicit cell-aspect override are saved in `settings.json` alongside todos, so subsequent launches need no flags. Themes recolor dashboard chrome and controls while preserving the scene artwork’s colors.
+
+## Computer details and temperature
+
+COMPUTER is divided into per-core CPU meters, system/hardware details, and the top three processes by CPU usage. Wide terminals show hardware and processes side by side; narrow terminals use a compact stacked view. Details include host, macOS and architecture, chip, physical/logical cores, memory usage and free memory, swap, load averages, uptime, and supported thermal/power readings. Process CPU can exceed 100% when using several cores.
+
+Temperature uses the optional [macmon](https://github.com/vladkens/macmon) executable on Apple Silicon. Install with `cargo install macmon --locked` or `brew install macmon`. No sudo, stored password, or sudoers change is required. The app samples CPU/GPU temperature and power in the background every five seconds. Hardware/OS compatibility can vary; failures display a sensor status rather than fabricated readings. Verify with `htm --temperature-check`.
+
+## LOFI ideas under discussion
+
+- **Mountain Dawn:** slow sunrise, soft fog between ridges, and warm sky colors.
+- **Mountain Sunset:** amber-to-purple sky, a lake reflection, then stars.
+- **Rainy Cabin:** window droplets, a warm lamp, and distant trees.
+- **Night Train:** passing lights beyond a window and a gently swaying cup.
+- **Ocean Moonlight:** subdued waves and a moonlit reflection.
+
+These are proposed scenes; the implemented scenes remain Fireplace, Beach, and Coffee Shop.

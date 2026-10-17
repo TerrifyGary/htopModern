@@ -1,7 +1,11 @@
+mod computer;
 mod graphics;
 mod lofi;
 mod media_layout;
 mod music;
+mod settings;
+mod temperature;
+mod theme;
 mod weather;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -74,11 +78,25 @@ struct App {
     graphics: std::cell::RefCell<graphics::Graphics>,
     weather: weather::Weather,
     music: music::Music,
+    theme: usize,
+    temperature: temperature::Temperature,
+    hardware: Vec<String>,
 }
 impl App {
     fn new(path: PathBuf) -> io::Result<Self> {
         let tasks = load_tasks(&path)?;
+        let settings = settings::Settings::load(&path.with_file_name("settings.json"));
+        let os = format!(
+            "{} {} · {}",
+            System::name().unwrap_or_default(),
+            System::os_version().unwrap_or_default(),
+            System::cpu_arch()
+        );
+        let hostname = System::host_name().unwrap_or_else(|| "Mac".into());
         let mut app = Self {
+            theme: theme::index(&settings.theme).unwrap_or(0),
+            temperature: temperature::Temperature::new(),
+            hardware: vec![hostname, os],
             weather: weather::Weather::new(path.with_file_name("weather.json")),
             music: music::Music::new(),
             sys: System::new(),
@@ -93,12 +111,24 @@ impl App {
             scene: 0,
             lofi_action: 0,
             started: Instant::now(),
-            cell_aspect: cell_aspect(),
-            aspect_override: None,
+            cell_aspect: settings
+                .cell_aspect
+                .filter(|r| (1.0..=4.0).contains(r))
+                .unwrap_or_else(cell_aspect),
+            aspect_override: settings.cell_aspect.filter(|r| (1.0..=4.0).contains(r)),
             graphics: std::cell::RefCell::new(graphics::Graphics::new()),
         };
         app.refresh();
         Ok(app)
+    }
+    fn save_settings(&mut self) {
+        let settings = settings::Settings {
+            theme: theme::NAMES[self.theme].into(),
+            cell_aspect: self.aspect_override,
+        };
+        if let Err(error) = settings.save(&self.path.with_file_name("settings.json")) {
+            self.message = format!("Could not save settings: {error}");
+        }
     }
     fn refresh(&mut self) {
         self.sys.refresh_cpu_all();
@@ -189,6 +219,11 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => return true,
+            KeyCode::F(2) => {
+                self.theme = (self.theme + 1) % 5;
+                self.message = format!("Theme: {}", theme::NAMES[self.theme]);
+                self.save_settings();
+            }
             KeyCode::Left if self.panel == 1 => self.music.selected = (self.music.selected + 2) % 3,
             KeyCode::Right if self.panel == 1 => {
                 self.music.selected = (self.music.selected + 1) % 3
@@ -245,95 +280,6 @@ fn block(title: &str, active: bool) -> Block<'_> {
 fn meter(value: f32, width: usize) -> String {
     let filled = ((value.clamp(0., 100.) / 100.) * width as f32).round() as usize;
     format!("{}{}", "┃".repeat(filled), "·".repeat(width - filled))
-}
-fn computer(f: &mut Frame, area: Rect, app: &App) {
-    let b = block(" COMPUTER ", false);
-    let inner = b.inner(area);
-    f.render_widget(b, area);
-    if inner.width < 25 || inner.height < 2 {
-        return;
-    }
-    let cols = (usize::from(inner.width) / 27).max(1);
-    let cpus = app.sys.cpus();
-    let rows = cpus.len().div_ceil(cols);
-    let mut lines = Vec::new();
-    for row in 0..rows.min(usize::from(inner.height).saturating_sub(11)) {
-        let mut text = String::new();
-        for col in 0..cols {
-            let i = col * rows + row;
-            if let Some(cpu) = cpus.get(i) {
-                text.push_str(&format!(
-                    "{i:>2} [{}] {:>5.1}%  ",
-                    meter(cpu.cpu_usage(), 12),
-                    cpu.cpu_usage()
-                ));
-            }
-        }
-        lines.push(Line::styled(text, Style::default().fg(GREEN)));
-    }
-    let separator = || {
-        Line::styled(
-            "- ".repeat(usize::from(inner.width).div_ceil(2))
-                .chars()
-                .take(usize::from(inner.width))
-                .collect::<String>(),
-            Style::default().fg(Color::Rgb(107, 101, 86)),
-        )
-    };
-    lines.push(Line::from(""));
-    lines.push(separator());
-    lines.push(Line::from(""));
-    let gb = 1_073_741_824.;
-    lines.push(
-        Line::from(format!(
-            "Mem {:.1}/{:.1} GB   Swap {:.1}/{:.1} GB",
-            app.sys.used_memory() as f64 / gb,
-            app.sys.total_memory() as f64 / gb,
-            app.sys.used_swap() as f64 / gb,
-            app.sys.total_swap() as f64 / gb
-        ))
-        .centered(),
-    );
-    let load = System::load_average();
-
-    lines.push(
-        Line::from(format!(
-            "Processes {}   Load {:.2} {:.2} {:.2}",
-            app.sys.processes().len(),
-            load.one,
-            load.five,
-            load.fifteen
-        ))
-        .centered(),
-    );
-    lines.push(Line::from(format!("Uptime {}   CPU temp: unavailable", uptime_label())).centered());
-    lines.push(Line::from(""));
-    lines.push(separator());
-    lines.push(Line::from(""));
-    lines.push(
-        Line::styled(
-            format!("{:<28} {:>7}   {:>10}", "PROCESS", "CPU", "MEMORY"),
-            Style::default().fg(AMBER),
-        )
-        .centered(),
-    );
-    let mut processes: Vec<_> = app.sys.processes().values().collect();
-    processes.sort_by(|a, b| b.cpu_usage().total_cmp(&a.cpu_usage()));
-    for p in processes
-        .into_iter()
-        .take(usize::from(inner.height).saturating_sub(lines.len()))
-    {
-        let name: String = p.name().to_string_lossy().chars().take(28).collect();
-        lines.push(
-            Line::from(format!(
-                "{name:<28} {:>6.1}%   {:>7.1} MB",
-                p.cpu_usage(),
-                p.memory() as f64 / 1_048_576.
-            ))
-            .centered(),
-        );
-    }
-    f.render_widget(Paragraph::new(lines), inner);
 }
 fn todos(f: &mut Frame, area: Rect, app: &App) {
     let b = block(" TODO · T ", app.panel == 2);
@@ -398,7 +344,7 @@ fn ui(f: &mut Frame, app: &App) {
         .cpus()
         .len()
         .div_ceil((usize::from(area.width) / 27).max(1));
-    let top = (rows + 15).min(usize::from(area.height) / 2).max(6) as u16;
+    let top = (rows + 17).min(usize::from(area.height) / 2).max(6) as u16;
     let parts = Layout::vertical([
         Constraint::Length(top),
         Constraint::Length(1),
@@ -406,7 +352,7 @@ fn ui(f: &mut Frame, app: &App) {
         Constraint::Length(2),
     ])
     .split(area);
-    computer(f, parts[0], app);
+    computer::draw(f, parts[0], app);
     if area.width >= 110 {
         let panels = Layout::horizontal([Constraint::Percentage(25); 4]).split(parts[2]);
         for (slot, i) in [0, 1, 3, 2].into_iter().enumerate() {
@@ -433,7 +379,7 @@ fn ui(f: &mut Frame, app: &App) {
     let status = if app.prefix {
         "Choose L / M / T / W"
     } else {
-        "Ctrl+B → L/M/T/W · Tab panel · Q quit"
+        "Ctrl+B → L/M/T/W · Tab panel · F2 theme · Q quit"
     };
     f.render_widget(
         Paragraph::new(format!("{status}\n{}", app.message)),
@@ -474,6 +420,14 @@ fn cell_aspect() -> f64 {
 }
 fn main() -> io::Result<()> {
     let args: Vec<_> = env::args().collect();
+    if args.iter().any(|arg| arg == "--temperature-check") {
+        let reading = temperature::sample().map_err(io::Error::other)?;
+        println!(
+            "CPU: {:?}°C · GPU: {:?}°C · no sudo",
+            reading.cpu, reading.gpu
+        );
+        return Ok(());
+    }
     if args.get(1).is_some_and(|a| a == "--music-check") {
         let reply = music::query(music::Action::Read).map_err(io::Error::other)?;
         println!("{}", reply.status);
@@ -495,7 +449,7 @@ fn main() -> io::Result<()> {
     }
 
     if args.iter().any(|a| a == "--help" || a == "-h") {
-        println!("htopmodern — cozy terminal dashboard\n\nCtrl+B then L/M/T/W: panel · Tab: next panel · Q: quit\nTODO: A adds, ↑↓ selects, ←→ selects checkbox/delete, Enter activates\nEntry: Enter saves, Escape cancels\nHTOPMODERN_DATA_DIR overrides todo storage.\n--cell-aspect 2.3 calibrates square weather scenes for your font.\n--check prints a system snapshot without entering full screen.");
+        println!("htopmodern — cozy terminal dashboard\n\nCtrl+B then L/M/T/W: panel · Tab: next panel · Q: quit\nTODO: A adds, ↑↓ selects, ←→ selects checkbox/delete, Enter activates\nEntry: Enter saves, Escape cancels\nHTOPMODERN_DATA_DIR overrides todo storage.\n--theme amber|forest|ocean|rose|mono selects a saved theme. F2 cycles themes.\n--temperature-check verifies the optional no-sudo macmon sensor.\n--cell-aspect 2.3 calibrates square weather scenes for your font.\n--check prints a system snapshot without entering full screen.");
         return Ok(());
     }
     if args.iter().any(|a| a == "--check") {
@@ -528,6 +482,14 @@ fn main() -> io::Result<()> {
             .ok_or_else(|| io::Error::other("--cell-aspect requires a number between 1 and 4"))?;
         app.cell_aspect = ratio;
         app.aspect_override = Some(ratio);
+        app.save_settings();
+    }
+    if let Some(index) = args.iter().position(|arg| arg == "--theme") {
+        app.theme = args
+            .get(index + 1)
+            .and_then(|s| theme::index(s))
+            .ok_or_else(|| io::Error::other("Choose --theme amber|forest|ocean|rose|mono"))?;
+        app.save_settings();
     }
     app.weather.request();
     app.music.request(music::Action::Read);
@@ -538,7 +500,11 @@ fn main() -> io::Result<()> {
         loop {
             app.weather.tick();
             app.music.tick();
-            terminal.draw(|f| ui(f, &app))?;
+            app.temperature.tick();
+            terminal.draw(|f| {
+                ui(f, &app);
+                theme::apply(f.buffer_mut(), app.theme);
+            })?;
             if event::poll(Duration::from_millis(100))? {
                 let event = event::read()?;
                 if matches!(event, Event::Resize(_, _)) {
