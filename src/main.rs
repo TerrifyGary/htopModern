@@ -257,7 +257,7 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
     let cpus = app.sys.cpus();
     let rows = cpus.len().div_ceil(cols);
     let mut lines = Vec::new();
-    for row in 0..rows.min(usize::from(inner.height).saturating_sub(7)) {
+    for row in 0..rows.min(usize::from(inner.height).saturating_sub(9)) {
         let mut text = String::new();
         for col in 0..cols {
             let i = col * rows + row;
@@ -281,32 +281,40 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
         )
     };
     lines.push(separator());
+    lines.push(Line::from(""));
     let gb = 1_073_741_824.;
-    lines.push(Line::from(format!(
-        "Mem {:.1}/{:.1} GB   Swap {:.1}/{:.1} GB",
-        app.sys.used_memory() as f64 / gb,
-        app.sys.total_memory() as f64 / gb,
-        app.sys.used_swap() as f64 / gb,
-        app.sys.total_swap() as f64 / gb
-    )));
+    lines.push(
+        Line::from(format!(
+            "Mem {:.1}/{:.1} GB   Swap {:.1}/{:.1} GB",
+            app.sys.used_memory() as f64 / gb,
+            app.sys.total_memory() as f64 / gb,
+            app.sys.used_swap() as f64 / gb,
+            app.sys.total_swap() as f64 / gb
+        ))
+        .centered(),
+    );
     let load = System::load_average();
 
-    lines.push(Line::from(format!(
-        "Processes {}   Load {:.2} {:.2} {:.2}",
-        app.sys.processes().len(),
-        load.one,
-        load.five,
-        load.fifteen
-    )));
-    lines.push(Line::from(format!(
-        "Uptime {}   CPU temp: unavailable",
-        uptime_label()
-    )));
+    lines.push(
+        Line::from(format!(
+            "Processes {}   Load {:.2} {:.2} {:.2}",
+            app.sys.processes().len(),
+            load.one,
+            load.five,
+            load.fifteen
+        ))
+        .centered(),
+    );
+    lines.push(Line::from(format!("Uptime {}   CPU temp: unavailable", uptime_label())).centered());
     lines.push(separator());
-    lines.push(Line::styled(
-        "PROCESS                         CPU       MEMORY",
-        Style::default().fg(AMBER),
-    ));
+    lines.push(Line::from(""));
+    lines.push(
+        Line::styled(
+            format!("{:<28} {:>7}   {:>10}", "PROCESS", "CPU", "MEMORY"),
+            Style::default().fg(AMBER),
+        )
+        .centered(),
+    );
     let mut processes: Vec<_> = app.sys.processes().values().collect();
     processes.sort_by(|a, b| b.cpu_usage().total_cmp(&a.cpu_usage()));
     for p in processes
@@ -314,11 +322,14 @@ fn computer(f: &mut Frame, area: Rect, app: &App) {
         .take(usize::from(inner.height).saturating_sub(lines.len()))
     {
         let name: String = p.name().to_string_lossy().chars().take(28).collect();
-        lines.push(Line::from(format!(
-            "{name:<28} {:>6.1}%   {:>7.1} MB",
-            p.cpu_usage(),
-            p.memory() as f64 / 1_048_576.
-        )));
+        lines.push(
+            Line::from(format!(
+                "{name:<28} {:>6.1}%   {:>7.1} MB",
+                p.cpu_usage(),
+                p.memory() as f64 / 1_048_576.
+            ))
+            .centered(),
+        );
     }
     f.render_widget(Paragraph::new(lines), inner);
 }
@@ -385,7 +396,7 @@ fn ui(f: &mut Frame, app: &App) {
         .cpus()
         .len()
         .div_ceil((usize::from(area.width) / 27).max(1));
-    let top = (rows + 11).min(usize::from(area.height) / 2).max(6) as u16;
+    let top = (rows + 13).min(usize::from(area.height) / 2).max(6) as u16;
     let parts = Layout::vertical([
         Constraint::Length(top),
         Constraint::Length(1),
