@@ -21,8 +21,6 @@ pub struct Track {
     playing: bool,
     position: f64,
     duration: f64,
-    #[serde(default)]
-    lyrics: Option<String>,
 }
 #[derive(Deserialize)]
 pub struct Reply {
@@ -107,8 +105,6 @@ pub struct Music {
     failed: bool,
     spin_phase: f64,
     spin_updated: Instant,
-    pub lyrics_scroll: usize,
-    pub show_lyrics: bool,
 }
 impl Music {
     pub fn new() -> Self {
@@ -122,8 +118,6 @@ impl Music {
             failed: false,
             spin_phase: 0.,
             spin_updated: Instant::now(),
-            lyrics_scroll: 0,
-            show_lyrics: true,
         }
     }
     pub fn request(&mut self, action: Action) {
@@ -147,11 +141,6 @@ impl Music {
         self.spin_updated = Instant::now();
         match result {
             Ok(reply) => {
-                if self.track.as_ref().map(|t| (&t.title, &t.artist))
-                    != reply.track.as_ref().map(|t| (&t.title, &t.artist))
-                {
-                    self.lyrics_scroll = 0;
-                }
                 self.track = reply.track;
                 self.status = reply.status;
                 self.observed = Instant::now();
@@ -188,19 +177,6 @@ impl Music {
             1 => Action::Toggle,
             _ => Action::Next,
         });
-    }
-    pub fn scroll_lyrics(&mut self, down: bool) {
-        let max = self
-            .track
-            .as_ref()
-            .and_then(|t| t.lyrics.as_ref())
-            .map(|s| s.lines().count().saturating_sub(1))
-            .unwrap_or(0);
-        self.lyrics_scroll = if down {
-            (self.lyrics_scroll + 1).min(max)
-        } else {
-            self.lyrics_scroll.saturating_sub(1)
-        };
     }
     fn position(&self) -> f64 {
         self.track
@@ -266,27 +242,27 @@ fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
         }
     }
 }
-fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
-    // Render the disc at 70% of the previous full-width diameter.
-    // Reserve track details and controls before allocating artwork or lyrics.
-    let minimum_lyrics = if show_lyrics && inner.height >= 23 {
-        3
-    } else {
-        0
-    };
-    let available = inner.height.saturating_sub(18 + minimum_lyrics);
+fn media_heights(inner: Rect, aspect: f64) -> u16 {
+    let available = inner.height.saturating_sub(18);
     let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
-    let cd = if available >= 4 {
+    if available >= 4 {
         desired.min(available)
     } else {
         0
-    };
-    let lyrics = if minimum_lyrics > 0 {
-        inner.height.saturating_sub(cd + 18).min(8)
-    } else {
-        0
-    };
-    (cd, lyrics)
+    }
+}
+fn progress_line(width: usize, position: f64, duration: f64) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    if duration <= 0. || !duration.is_finite() {
+        return "─".repeat(width);
+    }
+    let progress = (position / duration).clamp(0., 1.);
+    let index = (progress * (width - 1) as f64).round() as usize;
+    (0..width)
+        .map(|i| if i == index { '●' } else { '─' })
+        .collect()
 }
 fn equalizer_lines(width: u16, height: usize, playing: bool, time: f64) -> Vec<Line<'static>> {
     let count = usize::from(width).div_ceil(2);
@@ -316,11 +292,10 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let b = block(" MUSIC · M ", app.panel == 1);
     let inner = b.inner(area);
     f.render_widget(b, area);
-    let (cd_height, lyrics_height) = media_heights(inner, app.cell_aspect, music.show_lyrics);
+    let cd_height = media_heights(inner, app.cell_aspect);
     let sections = Layout::vertical([
         Constraint::Length(if cd_height > 0 { cd_height + 1 } else { 0 }),
         Constraint::Min(1),
-        Constraint::Length(lyrics_height),
     ])
     .split(inner);
     let divider = || {
@@ -337,25 +312,53 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
             Paragraph::new(divider()),
             Rect::new(sections[0].x, sections[0].y, sections[0].width, 1),
         );
-        let cd_area = Rect::new(
-            sections[0].x,
-            sections[0].y + 1,
-            sections[0].width,
-            sections[0].height.saturating_sub(1),
+        disc(
+            f,
+            Rect::new(
+                sections[0].x,
+                sections[0].y + 1,
+                sections[0].width,
+                sections[0].height.saturating_sub(1),
+            ),
+            music.spin_phase,
+            app.cell_aspect,
         );
-        disc(f, cd_area, music.spin_phase, app.cell_aspect);
     }
     let playing = music.track.as_ref().is_some_and(|t| t.playing);
-    let time = app.started.elapsed().as_secs_f64();
     let bar_rows = if sections[1].height >= 12 { 4 } else { 1 };
-    let mut lines = equalizer_lines(inner.width, bar_rows, playing, time);
+    let mut lines = equalizer_lines(
+        inner.width,
+        bar_rows,
+        playing,
+        app.started.elapsed().as_secs_f64(),
+    );
     if cd_height > 0 {
         lines.insert(0, divider());
     }
     lines.push(divider());
+    // Keep the player group balanced in the remaining space.
+    let gap = usize::from(sections[1].height).saturating_sub(lines.len() + 9) / 2;
+    lines.extend((0..gap).map(|_| Line::from("")));
     if let Some(track) = &music.track {
-        lines.push(Line::from(track.title.clone()).centered());
+        lines.push(
+            Line::styled(
+                track.title.clone(),
+                Style::default()
+                    .fg(CREAM)
+                    .add_modifier(ratatui::style::Modifier::BOLD),
+            )
+            .centered(),
+        );
         lines.push(Line::from(track.artist.clone()).centered());
+        lines.push(Line::from(""));
+        let width = usize::from(inner.width.saturating_sub(4)).min(48);
+        lines.push(
+            Line::styled(
+                progress_line(width, music.position(), track.duration),
+                Style::default().fg(AMBER),
+            )
+            .centered(),
+        );
         lines.push(
             Line::from(format!(
                 "{} / {}",
@@ -380,7 +383,7 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
                 .enumerate()
                 .map(|(i, label)| {
                     Span::styled(
-                        format!("{}{label}", if i > 0 { " " } else { "" }),
+                        format!("{}{label}", if i > 0 { "   " } else { "" }),
                         Style::default().fg(if app.panel == 1 && music.selected == i {
                             AMBER
                         } else {
@@ -392,36 +395,26 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         )
         .centered(),
     );
-    lines.push(Line::from("←→ select · Enter activate"));
-    lines.push(Line::from("Apple Music · R refresh"));
-    lines.push(Line::from(music.status.clone()));
-    lines.push(Line::from(""));
+    if music.failed || music.track.is_none() {
+        lines.push(Line::from(""));
+        lines.push(Line::from(music.status.clone()).centered());
+    }
     f.render_widget(
         Paragraph::new(lines).wrap(Wrap { trim: false }),
         sections[1],
     );
-    if lyrics_height > 0 {
-        let lyrics = music
-            .track
-            .as_ref()
-            .and_then(|t| t.lyrics.as_deref())
-            .unwrap_or("Lyrics unavailable for this track");
-        let content = lyrics
-            .lines()
-            .skip(music.lyrics_scroll)
-            .collect::<Vec<_>>()
-            .join("\n");
-        f.render_widget(
-            Paragraph::new(content)
-                .block(block(" LYRICS · ↑↓ ", false))
-                .wrap(Wrap { trim: false }),
-            sections[2],
-        );
-    }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn progress_dot_moves_and_clamps() {
+        assert_eq!(progress_line(5, 0., 100.), "●────");
+        assert_eq!(progress_line(5, 50., 100.), "──●──");
+        assert_eq!(progress_line(5, 200., 100.), "────●");
+        assert_eq!(progress_line(0, 0., 100.), "");
+        assert_eq!(progress_line(5, 0., 0.), "─────");
+    }
     #[test]
     fn equalizer_is_tall_thin_and_fills_width() {
         let lines = equalizer_lines(47, 4, true, 1.);
@@ -433,11 +426,10 @@ mod tests {
     }
     #[test]
     fn cd_uses_seventy_percent_of_full_width() {
-        let (cd, lyrics) = media_heights(Rect::new(0, 0, 46, 44), 2.3, true);
+        let cd = media_heights(Rect::new(0, 0, 46, 44), 2.3);
         assert_eq!(cd, 14);
-        assert!(lyrics >= 3);
-        assert!(cd + lyrics + 13 <= 44);
-        let (small, _) = media_heights(Rect::new(0, 0, 25, 8), 2.3, true);
+        assert!(cd + 18 <= 44);
+        let small = media_heights(Rect::new(0, 0, 25, 8), 2.3);
         assert_eq!(small, 0);
     }
     #[test]
@@ -449,7 +441,6 @@ mod tests {
             playing: true,
             position: 0.,
             duration: 100.,
-            lyrics: Some("one\ntwo\nthree".into()),
         });
         m.advance_spin(1.);
         let spinning = m.spin_phase;
@@ -457,8 +448,6 @@ mod tests {
         m.track.as_mut().unwrap().playing = false;
         m.advance_spin(5.);
         assert_eq!(m.spin_phase, spinning);
-        m.scroll_lyrics(true);
-        assert_eq!(m.lyrics_scroll, 1);
         m.track = None;
         m.advance_spin(5.);
         assert_eq!(m.spin_phase, spinning);
@@ -475,7 +464,6 @@ mod tests {
                 playing: false,
                 position: 42.,
                 duration: 100.,
-                lyrics: None,
             }),
             status: "Paused".into(),
         }));

@@ -188,11 +188,6 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') => return true,
-            KeyCode::Char('l') if self.panel == 1 => {
-                self.music.show_lyrics = !self.music.show_lyrics
-            }
-            KeyCode::Up if self.panel == 1 => self.music.scroll_lyrics(false),
-            KeyCode::Down if self.panel == 1 => self.music.scroll_lyrics(true),
             KeyCode::Left if self.panel == 1 => self.music.selected = (self.music.selected + 2) % 3,
             KeyCode::Right if self.panel == 1 => {
                 self.music.selected = (self.music.selected + 1) % 3
