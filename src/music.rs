@@ -274,7 +274,7 @@ fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
     } else {
         0
     };
-    let available = inner.height.saturating_sub(13 + minimum_lyrics);
+    let available = inner.height.saturating_sub(16 + minimum_lyrics);
     let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
     let cd = if available >= 4 {
         desired.min(available)
@@ -282,11 +282,34 @@ fn media_heights(inner: Rect, aspect: f64, show_lyrics: bool) -> (u16, u16) {
         0
     };
     let lyrics = if minimum_lyrics > 0 {
-        inner.height.saturating_sub(cd + 13).min(8)
+        inner.height.saturating_sub(cd + 16).min(8)
     } else {
         0
     };
     (cd, lyrics)
+}
+fn equalizer_lines(width: u16, height: usize, playing: bool, time: f64) -> Vec<Line<'static>> {
+    let count = usize::from(width).div_ceil(2);
+    let levels: Vec<_> = (0..count)
+        .map(|i| {
+            if playing {
+                1 + ((time * 3. + i as f64 * 1.9).sin().abs() * (height - 1) as f64).round()
+                    as usize
+            } else {
+                1
+            }
+        })
+        .collect();
+    (0..height)
+        .map(|row| {
+            let text = levels
+                .iter()
+                .map(|&level| if level >= height - row { "▏" } else { " " })
+                .collect::<Vec<_>>()
+                .join(" ");
+            Line::styled(text, Style::default().fg(GREEN))
+        })
+        .collect()
 }
 pub fn draw(f: &mut Frame, area: Rect, app: &App) {
     let music = &app.music;
@@ -304,23 +327,11 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         disc(f, sections[0], music.spin_phase, app.cell_aspect);
     }
     let playing = music.track.as_ref().is_some_and(|t| t.playing);
-    let symbols = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
     let time = app.started.elapsed().as_secs_f64();
-    let bars = (0..usize::from(inner.width).min(16))
-        .map(|i| {
-            let n = if playing {
-                ((time * 3. + i as f64 * 1.9).sin().abs() * 7.) as usize
-            } else {
-                0
-            };
-            symbols[n].to_string()
-        })
-        .collect::<Vec<_>>()
-        .join(" ");
-    let mut lines = vec![
-        Line::styled(bars, Style::default().fg(GREEN)),
-        Line::from(""),
-    ];
+    let bar_rows = if sections[1].height >= 12 { 4 } else { 1 };
+    let mut lines = equalizer_lines(inner.width, bar_rows, playing, time);
+    // Exactly one blank row separates the equalizer and track information.
+    lines.push(Line::from(""));
     if let Some(track) = &music.track {
         lines.push(Line::from(track.title.clone()));
         lines.push(Line::from(track.artist.clone()));
@@ -385,6 +396,15 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn equalizer_is_tall_thin_and_fills_width() {
+        let lines = equalizer_lines(47, 4, true, 1.);
+        assert_eq!(lines.len(), 4);
+        assert_eq!(lines[3].spans[0].content.matches('▏').count(), 24);
+        assert!(lines
+            .iter()
+            .all(|line| line.spans[0].content.chars().count() <= 47));
+    }
     #[test]
     fn cd_uses_seventy_percent_of_full_width() {
         let (cd, lyrics) = media_heights(Rect::new(0, 0, 46, 44), 2.3, true);
