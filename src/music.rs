@@ -104,6 +104,7 @@ pub struct Music {
     observed: Instant,
     failed: bool,
     spin_phase: f64,
+    equalizer_color: usize,
     spin_updated: Instant,
 }
 impl Music {
@@ -117,6 +118,7 @@ impl Music {
             observed: Instant::now(),
             failed: false,
             spin_phase: 0.,
+            equalizer_color: 0,
             spin_updated: Instant::now(),
         }
     }
@@ -141,6 +143,11 @@ impl Music {
         self.spin_updated = Instant::now();
         match result {
             Ok(reply) => {
+                if let (Some(old), Some(new)) = (&self.track, &reply.track) {
+                    if old.title != new.title || old.artist != new.artist {
+                        self.equalizer_color = (self.equalizer_color + 1) % 6;
+                    }
+                }
                 self.track = reply.track;
                 self.status = reply.status;
                 self.observed = Instant::now();
@@ -243,7 +250,7 @@ fn disc(f: &mut Frame, area: Rect, angle: f64, aspect: f64) {
     }
 }
 fn media_heights(inner: Rect, aspect: f64) -> u16 {
-    let available = inner.height.saturating_sub(18);
+    let available = inner.height.saturating_sub(20);
     let desired = (inner.width as f64 / aspect * 0.7).floor() as u16;
     if available >= 4 {
         desired.min(available)
@@ -264,7 +271,13 @@ fn progress_line(width: usize, position: f64, duration: f64) -> String {
         .map(|i| if i == index { '●' } else { '─' })
         .collect()
 }
-fn equalizer_lines(width: u16, height: usize, playing: bool, time: f64) -> Vec<Line<'static>> {
+fn equalizer_lines(
+    width: u16,
+    height: usize,
+    playing: bool,
+    time: f64,
+    color: Color,
+) -> Vec<Line<'static>> {
     let count = usize::from(width).div_ceil(2);
     let levels: Vec<_> = (0..count)
         .map(|i| {
@@ -283,7 +296,7 @@ fn equalizer_lines(width: u16, height: usize, playing: bool, time: f64) -> Vec<L
                 .map(|&level| if level >= height - row { "▏" } else { " " })
                 .collect::<Vec<_>>()
                 .join(" ");
-            Line::styled(text, Style::default().fg(GREEN))
+            Line::styled(text, Style::default().fg(color))
         })
         .collect()
 }
@@ -331,10 +344,20 @@ pub fn draw(f: &mut Frame, area: Rect, app: &App) {
         bar_rows,
         playing,
         app.started.elapsed().as_secs_f64(),
+        [
+            GREEN,
+            Color::Rgb(129, 182, 176),
+            Color::Rgb(205, 167, 109),
+            Color::Rgb(184, 155, 200),
+            Color::Rgb(208, 148, 153),
+            Color::Rgb(139, 171, 207),
+        ][music.equalizer_color],
     );
+    lines.insert(0, Line::from(""));
     if cd_height > 0 {
         lines.insert(0, divider());
     }
+    lines.push(Line::from(""));
     lines.push(divider());
     // Keep the player group balanced in the remaining space.
     let gap = usize::from(sections[1].height).saturating_sub(lines.len() + 9) / 2;
@@ -417,7 +440,7 @@ mod tests {
     }
     #[test]
     fn equalizer_is_tall_thin_and_fills_width() {
-        let lines = equalizer_lines(47, 4, true, 1.);
+        let lines = equalizer_lines(47, 4, true, 1., GREEN);
         assert_eq!(lines.len(), 4);
         assert_eq!(lines[3].spans[0].content.matches('▏').count(), 24);
         assert!(lines
